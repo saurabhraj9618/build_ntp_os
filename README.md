@@ -20,3 +20,6 @@
 
 ### to run gpsd2udp application
 #### click the "gps2udp" application under accessories 
+
+### one-drive link of NTP Server
+https://vehereinteractive-my.sharepoint.com/:f:/g/personal/saurabh_raj_vehere_com/En4UgUX5MOFDsheFER9k51oBtKX7_AII5h3dpJZtdP1K5g?e=UhesD2

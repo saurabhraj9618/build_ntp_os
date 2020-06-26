@@ -1,0 +1,15 @@
+[Unit]
+Description=Reconstruction Module
+#Requires=intelliworker.service
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=60
+#EnvironmentFile=/usr/local/etc/packetm_args.conf
+ExecStart=/usr/local/bin/recon/recon.sh
+SyslogIdentifier=reconstruction
+
+[Install]
+WantedBy=multi-user.target
+#Alias=super_mediator.service

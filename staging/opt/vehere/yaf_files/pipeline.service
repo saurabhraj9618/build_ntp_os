@@ -1,0 +1,13 @@
+[Unit]
+Description=Intelliworker Pipeline Module
+After=super_mediator.service
+
+[Service]
+#Type=forking
+EnvironmentFile=/usr/local/etc/pipeline_args.conf
+ExecStart=/usr/local/sbin/pipeline $ARG1 $ARG2 $ARG3 $ARG4 $ARG5 $ARG6 $ARG7 $ARG8
+Restart=always
+RestartSec=30
+[Install]
+WantedBy=multi-user.target
+#Alias=pipeline.service

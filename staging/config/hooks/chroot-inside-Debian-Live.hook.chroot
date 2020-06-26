@@ -1,0 +1,366 @@
+#!/bin/bash
+
+set -e
+
+# Setting up the LIVE root (during install on disk it is preseeded)
+echo "root:admin" | chpasswd
+
+# Enable color output and the "ll" command in shell 
+echo " export LS_OPTIONS='--color=auto'" >> /root/.bashrc
+echo " alias ll='ls $LS_OPTIONS -l'" >> /root/.bashrc
+
+###  Set up repos ###
+
+wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | apt-key add -
+
+cat >> /etc/apt/sources.list.d/elastic-5.x.list <<EOF
+deb https://artifacts.elastic.co/packages/5.x/apt stable main
+EOF
+
+cat >> /etc/apt/sources.list.d/curator5.list <<EOF
+deb http://packages.elastic.co/curator/4/debian stable main
+EOF
+
+cd /opt/vehere
+
+
+apt-get update && \
+apt-get install -y ca-certificates-java openjdk-8-jre-headless \
+openjdk-8-jdk openjdk-8-jre openjdk-8-jre-headless
+
+### END JAVA for ELK ###
+
+### START ELK ###
+
+#apt-get update && \
+#apt-get install -y elasticsearch-curator
+
+#wget https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-5.5.2.deb
+#sha1sum elasticsearch-5.5.2.deb
+#sudo dpkg -i elasticsearch-5.5.2.deb
+#echo "elasticsearch hold" | dpkg --set-selections
+
+#wget https://artifacts.elastic.co/downloads/logstash/logstash-5.5.2.deb
+#sha1sum logstash-5.5.2.deb
+#sudo dpkg -i logstash-5.5.2.deb
+#echo "logstash hold" | dpkg --set-selections
+
+#cd /opt/vehere/vnfsui/
+#chmod +x generate-CA.sh
+#cp generate-CA.sh /usr/local/share/ca-certificates/
+#cd /usr/local/share/ca-certificates/
+#./generate-CA.sh
+#./generate-CA.sh VEHERE
+
+#cd /opt/vehere/vnfsui/
+#sudo dpkg -i kibana-5.5.2-amd64.deb
+
+##kibana configuration dependencies ############
+#cp -r /opt/vehere/config/*  /usr/local/etc/
+
+#chown -R kibana:kibana /usr/local/etc/license
+
+#chown kibana:kibana /usr/local/etc/iface.monitoring.lst
+#chown kibana:kibana /usr/local/etc/iface.negative.lst
+#chown kibana:kibana /usr/local/etc/filter_error.lst
+#chown kibana:kibana /usr/local/etc/filter_input.lst
+#chown kibana:kibana /usr/local/etc/capture_settings.json
+#chown kibana:kibana /usr/local/etc/vnfs.json
+#chmod 644 /usr/local/etc/vnfs.json
+
+#rm -f /etc/kibana/kibana.yml
+#cp kibana.yml /etc/kibana/
+
+#sed -i -e 's|vnfs\_hostname|VEHERE|' /etc/kibana/kibana.yml
+#/usr/share/kibana/bin/kibana-plugin install "file:///opt/vehere/vnfsui/vnfsui-pack-1.0.0.zip"
+
+#chown kibana:kibana /usr/share/kibana/optimize/bundles/*
+
+#chown kibana:kibana /usr/local/share/ca-certificates/VEHERE.crt
+#chown kibana:kibana /usr/local/share/ca-certificates/VEHERE.key
+
+
+#cat >> /etc/sudoers <<EOF
+#kibana ALL=(ALL:ALL) NOPASSWD:ALL 
+#EOF
+
+#mkdir /var/log/vnfsuisecurity
+#chown kibana:kibana /var/log/vnfsuisecurity
+
+#echo "kibana hold" | dpkg --set-selections
+
+#mkdir -p /var/cache/logstash/sincedbs/
+#chown logstash:logstash /var/cache/logstash/sincedbs/
+
+#sudo /bin/systemctl enable elasticsearch && \
+#sudo /bin/systemctl enable logstash && \
+#sudo /bin/systemctl enable kibana && \
+#sudo /bin/systemctl daemon-reload
+
+#sudo /bin/systemctl restart kibana.service
+#sudo /bin/systemctl restart elasticsearch.service
+### END ELK ###
+
+
+######  install vnfsui dashboards ##############
+
+#cd /opt/vehere/vnfsui/
+
+#cp -r vnfsui-dashboard /opt/
+#chmod +x vnfsui-dashboards-autoload
+#cp vnfsui-dashboards-autoload /etc/init.d/
+#update-rc.d vnfsui-dashboards-autoload defaults
+#cd vnfsui-dashboard
+#chmod +x load.sh
+#cd ..
+#cp -r monitoring-dashboards /opt/
+#cd monitoring-dashboards
+#chmod +x metricbeat_install.sh
+#./metricbeat_install.sh
+#cd ..
+
+#echo "metricbeat hold" | dpkg --set-selections
+###### Install mapserver ########
+
+#cd /opt/vehere/vnfsui/
+#tar xaf maps.tar.xz
+
+#mv maps /usr/local/src/
+
+#cp /usr/local/src/maps/mapserver.service /etc/systemd/system/
+
+#sudo /bin/systemctl enable mapserver.service && \
+#sudo /bin/systemctl daemon-reload
+#sudo /bin/systemctl restart mapserver.service
+
+#rm -f /etc/default/logstash
+#cp /opt/vehere/logstash/logstash /etc/default/
+#chmod 646 /etc/default/logstash
+
+#mkdir /usr/local/etc/ruleengine 
+#mkdir /usr/local/etc/ruleengine/input
+#chown -R kibana:kibana /usr/local/etc/ruleengine
+#mkdir /var/log/ruleengine && chown -R root:root /var/log/ruleengine
+#chmod 757 /var/log/ruleengine
+
+#pip install /opt/vehere/elasticsearch-py.tar.gz
+
+####### Install nmap ############
+#cd /opt/vehere
+#tar xaf nmap-7.70.tgz
+
+#cd nmap-7.70
+#./configure
+#make
+#make install 
+
+#rm -f nmap-7.70.tgz
+
+#apt-get install -y dnsutils moreutils
+###### vnfsalert installation  #########################
+
+#cd /opt/vehere
+#chmod +x vnfsalert-install.sh
+#./vnfsalert-install.sh
+
+#cd /opt/vehere
+#rm -f /usr/local/etc/ruleengine/input/*.yaml
+#cp vnfsalert_files/input/*.yaml /usr/local/etc/ruleengine/input/
+#chown kibana:kibana /usr/local/etc/ruleengine/input/*
+#cp vnfsalert_files/*.txt /usr/local/etc/ruleengine/
+
+### END Install vnfsui dashboards ###
+
+### Start Install ZC-balancer drivers pf_ring #################
+#cd /opt/vehere/
+#git clone https://github.com/dell/dkms.git
+#cd dkms
+#make
+#chmod +x dkms
+#cd /opt/vehere/7.0/
+
+#chmod +x install.sh
+#./install.sh
+
+### End Install #################################
+
+################# PF-Ring & libpcap #######################
+#cd /usr/lib/x86_64-linux-gnu
+#mv libpcap.so.1.8.1 libpcap.so.1.8.1.orig
+#mv libpcap.a libpcap.a.orig
+#rm -f libpcap.a
+#rm -f libpcap.so.1.8.1
+
+#cp /usr/local/lib/libpcap.so.1.8.1 /usr/lib/x86_64-linux-gnu/
+#cp /usr/local/lib/libpcap.a /usr/lib/x86_64-linux-gnu/
+#rm -f libpcap.so
+#rm -f libpcap.so.0.8
+#ln -s libpcap.so.1.8.1 libpcap.so.0.8
+#ln -s libpcap.so.0.8 libpcap.so
+#cp /opt/vehere/PF_RING/tools/n2if /usr/local/bin
+
+################# nDPI ########################
+#cd /opt/vehere/ndpi_files
+
+#cp -r pcap /usr/local/include/
+#cp pcap/*.h /usr/local/include/
+
+#unzip nDPI-2.8.zip
+#cd nDPI-2.8
+#./autogen.sh
+#./configure
+#make
+#make install
+
+#cd src/lib 
+#cp -r third_party /usr/local/lib/
+
+############################Install logstash plugin translate & logstash plugin math###################
+#sudo /usr/share/logstash/bin/logstash-plugin install logstash-filter-translate
+#sudo /usr/share/logstash/bin/logstash-plugin install logstash-filter-math
+#sudo /usr/share/logstash/bin/logstash-plugin install logstash-filter-cidr
+#sudo /usr/share/logstash/bin/logstash-plugin install logstash-input-syslog
+#sudo /usr/share/logstash/bin/logstash-plugin install logstash-output-email
+#sudo /usr/share/logstash/bin/logstash-plugin install logstash-output-syslog
+#sudo /usr/share/logstash/bin/logstash-plugin install logstash-output-websocket
+
+
+#mkdir /usr/local/etc/dictionaries
+
+#cp /opt/vehere/dictionaries/*.* /usr/local/etc/dictionaries/
+
+######################Create /var/log/vehere/dpi /var/log/vehere/stat ##########
+#mkdir /var/log/vehere
+#mkdir /var/log/vehere/dpi
+#mkdir /var/log/vehere/stats
+#mkdir /var/log/flowtmp
+#mkdir /var/log/flowtmp/pcap-stats
+#mkdir /var/log/flowtmp/pcap-dpi
+#mkdir /var/log/pcap
+#mkdir /var/log/vehere/pcapdpi
+#mkdir /var/log/vehere/pcapstats
+#mkdir /var/log/importpcap
+#mkdir -p /var/log/vehere/raw/recon
+#chmod 777 /var/log/vehere/raw/recon
+
+#chown logstash:logstash /var/log/flowtmp
+#chown logstash:logstash /var/log/flowtmp/pcap-dpi
+#chown logstash:logstash /var/log/flowtmp/pcap-stats
+#chown logstash:logstash /var/log/pcap
+#chown -R logstash:logstash /var/log/vehere
+#chown kibana:kibana /var/log/importpcap
+
+########################Copy Startall and startpipeline script#################
+
+
+cp /opt/vehere/startall.sh /usr/local/bin/
+
+chmod +x /usr/local/bin/startall.sh
+
+
+cp /opt/vehere/stopall.sh /usr/local/bin/
+chmod +x /usr/local/bin/stopall.sh
+
+#cp /opt/vehere/intelliworker.sh /usr/local/bin/
+#chmod +x /usr/local/bin/intelliworker.sh
+
+#cp -r /opt/vehere/ml_files /opt/
+#cd /opt/ml_files/
+#chmod +x ML-installation.sh
+#./ML-installation.sh
+
+
+#cd /opt/vehere
+#cp intelliworker.service /etc/systemd/system/
+
+#sudo /bin/systemctl disable intelliworker.service && \
+#sudo /bin/systemctl enable intelliworker.service && \
+#sudo /bin/systemctl daemon-reload
+
+#sudo rm -f /etc/systemd/system/pf_ring.service
+#sudo /bin/systemctl daemon-reload
+
+#cd ..
+
+#### Probe, Reconstruction service implementation ##
+#cd /opt/vehere/
+#cp -r probe_files/probe /usr/local/bin/
+#cp -r probe_files/recon /usr/local/bin/
+#cp probe_files/pf_ringctl /usr/local/bin/
+
+#chmod +x /usr/local/bin/pf_ringctl
+#chmod +x /usr/local/bin/probe/*
+#chmod +x /usr/local/bin/recon/*.jar
+
+#cp probe_files/reconstruct.service /etc/systemd/system/
+
+#/bin/systemctl enable reconstruct.service && \
+#	/bin/systemctl daemon-reload
+
+
+#cp /opt/vehere/vehere-mldns /etc/logrotate.d/
+#cp /opt/vehere/vehere-mlflow /etc/logrotate.d/
+#cp /opt/vehere/vehere-probe /etc/logrotate.d/
+#cp /opt/vehere/delete-old-logs.sh /opt/
+#chmod 644 /etc/logrotate.d/*
+#chmod 755 /opt/delete-old-logs.sh
+
+#echo "0 4 * * * root /opt/delete-old-logs.sh" >> /etc/crontab
+# alway leave a empty line before cron files end
+#echo "" >> /etc/crontab
+
+# Set up the host name
+echo "VEHERE" > /etc/hostname
+
+# Enable the ssh banners
+sed -i -e 's|\#Banner \/etc\/issue\.net|Banner \/etc\/issue\.net|'  /etc/ssh/sshd_config
+
+
+sed -i -e 's|Name\=Install Debian sid|Name\=Install Intelliworker|'  /usr/share/applications/debian-installer-launcher.desktop 
+
+
+#apt-get update && \
+#apt-get install -y linux-headers-amd64
+
+#rm -f /etc/logstash/jvm.options
+#cp /opt/vehere/logstash/jvm.options /etc/logstash/
+
+#rm -f /etc/systemd/system/logstash.service
+#cp /opt/vehere/logstash/logstash.service /etc/systemd/system/
+#sudo /bin/systemctl daemon-reload
+
+dpkg -i /opt/vehere/firmware-bnx2_20161130-3_all.deb
+
+echo "firmware-bnx2 hold" | dpkg --set-selections
+
+#rm -f /etc/elasticsearch/elasticsearch.yml
+#rm -f /etc/elasticsearch/jvm.options
+#cp /opt/vehere/elasticsearch/elasticsearch.yml /etc/elasticsearch/
+#cp /opt/vehere/elasticsearch/jvm.options /etc/elasticsearch/
+#cat >> /etc/security/limits.conf <<EOF
+#elasticsearch    -       nofile          65536
+#EOF
+
+#sed -i -e 's|\#MAX\_LOCKED\_MEMORY\=unlimited|MAX\_LOCKED\_MEMORY\=unlimited|'  /etc/default/elasticsearch
+#sed -i -e 's|\#LimitMEMLOCK\=infinity|LimitMEMLOCK\=infinity|' /usr/lib/systemd/system/elasticsearch.service
+#sudo /bin/systemctl daemon-reload
+
+#NTP 
+cp /opt/vehere/ntp.conf /etc/
+chmod 777 /etc/ntp.conf
+cp /opt/vehere/gpsd /etc/default/
+cp /opt/vehere/gps.png /opt/
+cp /opt/vehere/gpsd2udp.sh /opt/
+cp /opt/vehere/gps2udp.desktop /usr/share/applications/
+
+# Clean devel and some others packages
+apt-get -y remove bison  autoconf automake libc6-dev autotools-dev libpcap-dev libnet1-dev libcap-ng-dev \
+	libnetfilter-queue-dev  libnss3-dev libnspr4-dev libyaml-dev \
+	xscreensaver xscreensaver-data manpages-dev libjansson-dev \
+	ghostscript xmms2-core x11proto-core-dev linux-libc-dev \
+	rpm alien sane-utils libsane rpm2cpio \
+	libx11-dev libx11-doc m4
+rm -rf /opt/vehere/
+apt-get autoremove -y
+apt-get clean && \
+cat /dev/null > ~/.bash_history && history -c

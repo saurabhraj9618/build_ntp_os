@@ -1,0 +1,16 @@
+/var/log/vehere/ml-alert/* {
+        daily
+        minage 10
+        maxsize 100G
+        size 100G
+        rotate 0
+        missingok
+#       postrotate
+#           /bin/kill -HUP $(cat /var/run/yaf.pid)
+#           /bin/kill -HUP $(cat /var/run/logstash.pid)
+#       endscript
+}
+# to see status
+# cat /var/lib/logrotate/status
+# to manually test -
+# logrotate --force /etc/logrotate.d/vehere-mlflow

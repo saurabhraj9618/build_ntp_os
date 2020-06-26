@@ -1,0 +1,3595 @@
+=pod
+
+=head1 NAME
+
+B<super_mediator.conf> - Configuration file for super_mediator
+
+=head1 DESCRIPTION
+
+As part of the collecting and exporting of flow data, B<super_mediator>
+needs to know what type of data it is collecting and how to collect it
+(e.g. listen on 18000/udp or export to 18001/tcp or collect only flow data
+with source port = 80).  The Super Mediator Configuration File,
+F<super_mediator.conf>, contains this information, and this manual page
+describes the syntax of the file.
+
+The F<super_mediator.conf> file may have any name, and it does not have to
+reside in a particular location.  The location of the file is specified by
+the C<--config> switch to B<super_mediator>.
+
+Some command line arguments will override settings declared in the
+configuration file.  In particular, any collector information provided
+on the command line will override collectors defined in the configuration file.
+Command line arguments for exporters will be ignored if a configuration
+file is also present.
+
+The Configuration file for B<super_mediator> defines the following concepts:
+
+=over 4
+
+=item collector
+
+A collector specifies a source for flow data from B<yaf(1)>.  The source
+could be a transport protocol such as TCP or UDP or Spread.  The source could
+also be a directory that is periodically polled for IPFIX files, or it could
+simply be a single file to process.  When defining the collector, you must
+specify the collector type.  Valid types are TCP, UDP, SPREAD, FILEHANDLER,
+and DIR.  B<super_mediator> expects IPFIX data created by B<yaf(1)> or
+B<super_mediator>.  It may collect other valid IPFIX data but expects certain
+information elements to be present to use particular features.
+
+=item filter
+
+If a filter is specified, B<super_mediator> passes each flow record
+through each filter to determine whether the record should be passed
+to the exporters.  A filter block in the configuration file defines filters
+for the collector processes only.  Filters may be specified for each exporter,
+but should exist in the appropriate exporter block.  A filter that is defined
+in a collector block will only apply to that particular collector. A filter
+that is defined outside of a collector or exporter block will apply to ALL
+collectors.
+
+=item exporter
+
+An exporter specifies a desination for the flow data it processes.
+The B<super_mediator> can have multiple exporters.  The destination point
+can be a transport protocol such as TCP, UDP, or Spread.  It can be a single
+IPFIX or TEXT file, or otherwise it could be a directory that
+B<super_mediator> will rotate output files every so many seconds.  When
+defining the exporter, you must specify the exporter type.  Valid types
+are TCP, UDP, SPREAD, FILEHANDLER, or TEXT.  Only one SPREAD Exporter
+is permitted, due to the nature of Spread. A Spread Exporter can export to
+multiple Spread Groups.  A TEXT exporter can be configured to import CSV files
+to a MySQL database if MySQL libraries are available.  Exporters may have
+filters associated with them.  When B<super_mediator> loses connection with
+one of the configured exporters, it will report an initial warning message
+to the log and retry the connection immediately.  If the retry is unsuccessful,
+ it will retry the connection every 15 seconds until successful.  To verify
+the connection attempts, use the DEBUG loglevel.  Flows will be lost
+while the connection is down.
+
+=item group
+
+A Spread exporter is a special type of exporter, since one Spread Exporter
+can export to multiple points using defined groups.  Spread is a
+pub/sub high performance message service.  Spread functions as a unified
+message bus for distributed applications.  The Spread exporter specifies
+the Spread daemon name to connect and one or more Spread groups in the EXPORTER
+block.  Then in the GROUP block, the group name is specified along with one
+or more filters to use when deciding what flow records to send to the group.
+For each defined group name in the EXPORTER block, one GROUP block can be
+defined.
+
+=item dns-dedup
+
+The B<super_mediator> will perform dns de-duplication for each exporter that
+enables dns de-duplication.  It will take any resource record information
+collected from B<yaf(1)> and cache rrname, rrtype, and rrval tuples for each
+resource record.  If a new record arrives that does not exist in the cache,
+the record is exported to the appropriate exporters. Otherwise, the hitcount
+is incremented and flushed based on the default values or the values
+specified in the DNS_DEDUP block.
+
+=item dpi-config
+
+The DPI_CONFIG block is used for advanced configuration of the
+Deep Packet Inspection (DPI) data export of an EXPORTER in TEXT mode.
+The B<super_mediator> can be configured to insert labels into the CSV
+output of DPI metadata.  This can be used to assist a database loading process
+to determine which table in the database a particular line should be inserted.
+The label is effectively the name of the database table the line
+should be loaded in to.  The DPI_CONFIG block allows the user to choose
+which DPI fields (user agent strings, urls, etc.) are exported and
+how they should be labeled according to their personal database schema.
+This block is optional.
+It is only necessary if you want a subset of the available DPI
+fields or the default table names are not sufficient.  The DPI_CONFIG
+block can also be used in conjunction with the
+Exporter command, B<MULTI_FILES>, to configure the names of the
+output files.  See B<MULTI_FILES> below for more information.
+
+=item ssl-config
+
+THE SSL_CONFIG block is used to configure which SSL X.509 certificate
+fields an EXPORTER in TEXT mode will write.  Each TEXT EXPORTER may
+have one SSL_CONFIG block associated with it.  Within the SSL_CONFIG
+block, you can specify ISSUER fields, SUBJECT fields, and OTHER fields.
+This block is similar to a DPI_FIELD_LIST but is the only way to configure
+which fields from the ISSUER and SUBJECT of an X.509 Certificate will be
+exported. If this block is present for an EXPORTER, all SSl/TLS fields will be
+disabled unless explicitly specified within one of the lists.
+
+This block is also used for enabling SSL Certificate Deduplication.
+B<super_mediator> will perform SSL de-duplication if SSL_DEDUP is present
+in this block or SSL_DEDUP_ONLY is present in any EXPORTER block.  It
+will take SSL Certificate information collected by B<yaf(1)> and output
+the certificate information once and cache the serial number and issuer
+name for each certificate. Certificates matching the serial number and issuer
+tuple will simply increment the internal counters.  Certificates in the
+cache are flushed based on the default values or the configurable
+values specified in this block.
+
+=item dedup-config
+
+B<super_mediator> will perform de-duplication of most deep packet inspection
+(DPI) information element values if enabled. To enable de-duplication, this
+block must be present and "assigned" to one EXPORTER using the exporter
+name.  Using the provided information element ID, B<super_mediator> will
+cache the value of the information element ID and the source IP address OR
+destination IP address.  Any record that contains the same tuple will
+increment the hitcount in the cache.  The record will be flushed when either
+the max hit count is reached or no records with the same tuple have been
+seen in the configurable timeout period.
+
+=item maps
+
+B<super_mediator> can add an additional key for deduplication with a
+VLAN_MAP or OBID_MAP. Without the use of a MAP, B<super_mediator> will use
+the  SIP, DIP, or FLOW KEY HASH to aggregate DPI information elements. If you
+additionally want to aggregate information elements per VLAN (or group of VLANs)
+or per Observation ID (or group of observation IDs) then use a VLAN_MAP or
+OBID_MAP to define the mapping of IDs to String.  The String provided will
+be included in the output record.
+
+=back
+
+=head1 SYNTAX
+
+When parsing the B<super_mediator> configuration file, blank lines are
+ignored.  At any location in a line, the character C<#> indicates
+the beginning of a comment, which continues to the end of the line. These
+comments are ignored.
+
+All other lines begin with optional leading whitespace, a command name, and
+one or more arguments to the command.  Command names are a sequence of
+non-whitespace characters.  Arguments are textual atoms: any sequence of
+non-whitespace, non-C<#> characters, including numerals and punctuation.
+
+There are nine main contexts for commands: top-level, collector block,
+filter block, exporter block, group block, dns-dedup,
+ssl-config, dedup-config, and dpi-config block.  The collector
+block, filter block, exporter block, group block, dns-dedup, dpi-config,
+ssl-config, and dedup-config block contexts
+are used to describe individual features of collectors, filters, exporters,
+spread groups, DNS de-duplication, DPI export, SSL configuration
+and de-duplication, and general de-duplication respectively.
+
+The valid commands for each context are described below.
+
+=head2 Top-Level Commands
+
+In addition to the commands to begin a collector, filter, exporter, group,
+dns-dedup, dpi-config, ssl-config, dedup-config, or map block, the top-level context
+supports the following commands:
+
+=over 4
+
+=item NO_STATS
+
+If the B<NO_STATS> keyword is present anywhere in the configuration file
+outside of a collector, filter, exporter, or group block, any stats
+messages received from B<yaf(1)> will be dropped.  They will not be logged
+to the B<super_mediator> log file (if specified) nor will they be exported
+to any of the defined exporters.  The B<super_mediator> also keeps process
+statistics about how many flows it receives, filters, and exports.  This stats
+message is logged every 5 minutes.  If B<NO_STATS> is present, this stats
+message will not be logged.
+
+=item LOG_FILE I<LOG_SPECIFIER>
+
+Specifies the destination for log messages.  B<LOG_FILE> can be a B<syslog(3)>
+facility name, the special value B<stderr> for standard error, or the absolute
+path to a file for file logging.  The default log specifier is B<stderr>.
+The log level can be specified by the B<LOGLEVEL> keyword.  Default level is WARNING.
+The log file contains process statistics such as uptime, total flows received,
+DNS flows received, and deduplicated flows.  It also contains information
+about each of the collectors and exporters.  In addition, it will record
+any statistics messages received from YAF.  Below are example log messages.
+Lines that begin with "SM" are statistics about B<super_mediator>. The "SM"
+log messages contain the uptime, total number of flows received by all
+Collectors, any flows that were filtered by all collectors, and the total
+number of statistics (IPFIX options records) received.  If DNS deduplication
+is enabled, B<super_mediator> will also report the number of flows that
+contain DNS data (dns), the number of individual resource records (RRrecords),
+and the number of DNS records "exported" after deduplication (dedup).
+B<yaf> statistics contain "YAF" and the Collector name that received
+the stats record.  The Exporter line contains the number of flows exported,
+statistics exported, and information about bandwidth.  If DNS deduplication
+is enabled, the Exporter will also report the number of DNS records exported.
+The Collector log message reports the number of flows received by that collector,
+the total number of statistics (IPFIX options) records, the total number of
+flows filtered, and the number of connections accepted.
+
+    SM: Uptime: 0d:0h:4m:23s, Total Flows: 93, Filtered: 0, Stats: 0
+
+    SM: dns: 10, RRrecords: 41 dedup: 0
+
+    C2: YAF ID: 10 IP: 10.20.11.51 Uptime: 0d:0h:5m:1s
+
+    C2: YAF Flows: 104 Packets: 13230 Dropped: 0 Ignored: 188 Out of Sequence: 0 Expired Frags: 0 Assembled Frags: 0
+
+    Exporter E4: 96 flows, 0 stats, 0.0005 Mbps, 192.00 bytes per record
+
+    Collector C2: 93 flows, 0 stats, 0 filtered, 1 connection
+
+=item LOG_DIR I<LOG_DIRECTORY_PATH>
+
+If present, B<super_mediator> will write log files to
+I<LOG_DIRECTORY_PATH>.  I<LOG_DIRECTORY_PATH> must be a
+complete directory path.  The log files have the form
+
+I<LOG_DIRECTORY_PATH>/sm-YYYYMMDD.log
+
+where YYYYMMDD is the current date.  The log files are
+rotated at midnight local time.  When the log files are
+rotated a new log is opened, the previous file is closed,
+and B<gzip(1)> is invoked on the previous day's log file.
+(Old log files will not be removed by B<super_mediator>.)
+
+=item LOGLEVEL I<LOG_LEVEL>
+
+Specify minimum level for logged messages.  In increasing levels of verbosity,
+the supported log levels are QUIET, ERROR, WARNING, MESSAGE, and DEBUG.
+The default logging level is B<WARNING>.  This level only logs critical errors
+or potential problems.  The B<MESSAGE> level will log all B<yaf(1)> process
+statistics it receives, along with periodic process statistics about itself.
+Setting the B<LOG_LEVEL> to QUIET, ERROR, or WARNING will prevent these
+messages from being logged.  The B<DEBUG> level will report any
+I/O operations, such as opening, closing, moving, and deleting of
+input and output files in addition to all B<yaf(1)> and B<super_mediator>
+process statistics.
+
+=item PIDFILE I<PIDFILE_NAME>
+
+If present, and B<super_mediator> is run in daemon mode, the B<super_mediator>
+will write the process ID (pid) to the file specified by I<PIDFILE_NAME>.
+I<PIDFILE_NAME> should be the complete path to the file.
+
+=item STATS_TIMEOUT I<TIMEOUT_SECOND>
+
+If present, log B<super_mediator> process statistics every I<TIMEOUT_SECOND>
+seconds.  The default is 5 minutes [600 seconds].  If set to 0,
+B<super_mediator> will not log statistics.
+
+=item USER_IE I<INFO_ELEMENT_ID> I<INFO_ELEMENT_NAME> *I<APPLICATION_LABEL>*
+
+If present, add the Information Element with ID I<INFO_ELEMENT_ID>
+and I<INFO_ELEMENT_NAME> name to the Information Model.  The Information
+Element will have the CERT Private Enterprise Number.  If user-defined
+Information Elements are not added prior to collection, B<super_mediator>
+will ignore the information element and emit a warning similar to:
+
+    BasicList Decode Error: No Information Element with ID 254 defined
+
+Any user-defined information element defined in the yafDPIRules.conf file,
+should also be added to the super_mediator.conf in order for
+B<super_mediator> to collect the element.  If I<APPLICATION_LABEL> is
+present, then this element will be added to the appropriate file if using
+MULTI_FILES.  For example, if I<APPLICATION_LABEL> is set to 80, then the
+information element will be added to the http.txt file by default.  If you
+are using custom lists or a DPI_FIELD_LIST, setting I<APPLICATION_LABEL>
+is not necessary.  If DPI_CONFIG is set for custom tables, do not set
+I<APPLICATION_LABEL>.
+
+=over 1
+
+    USER_IE 999 my_info_element
+    USER_IE 1002 http_other_field 80
+
+=back
+
+
+=back
+
+=head2 Collector Block
+
+The first command below is used at the top-level to begin a
+collector definition block, and the remaining commands are accepted
+ within the collector context.
+
+=over 4
+
+=item B<COLLECTOR> I<COLLECTOR-TYPE> I<COLLECTOR-NAME>
+
+The B<COLLECTOR> command begins a new collector block and it continues to
+the S<B<COLLECTOR END>> command.  The argument to the B<COLLECTOR> command is
+the type of collector to be defined and an OPTIONAL I<COLLECTOR-NAME>. The
+I<COLLECTOR-NAME> will be used in the log file and in the default
+flow and stats pipe-delimited text output.  If I<COLLECTOR-NAME> is not
+provided, B<super_mediator> uses C1, C2, C3, etc.
+The I<COLLECTOR-TYPE> must be one of the following:
+
+=over 4
+
+=item B<TCP>
+
+This collector processes IPFIX, listening for connections from B<yaf(1)> on
+a TCP port.
+
+=item B<UDP>
+
+This collector processes IPFIX, listening for connections from B<yaf(1)> on
+a UDP port.  Note that UDP is not recommended, as it is not a reliable
+transport protocol, and thus cannot guarantee delivery of messages.  Also
+note that unless the B<super_mediator> is started prior to starting B<yaf(1)>,
+it will not receive the necessary templates until B<yaf(1)> periodically transmits
+them as specified by the command line B<--udp-temp-timeout> given to B<yaf(1)>
+at startup time.  libfixbuf will display warning messages until the templates
+are received.
+
+=item B<SPREAD>
+
+This collector subscribes to the given group names through the Spread daemon,
+also supplied in the B<COLLECTOR> block.
+
+=item B<FILEHANDLER>
+
+This collector reads from a single IPFIX file.
+
+=item B<DIR>
+
+This collector polls the given directory waiting for files that match a
+given glob pattern.  It will either delete files (default) after they have been
+processed and transmitted to the appropriate exporters, or move the files
+to the given directory (specified in the B<COLLECTOR> block).
+
+=back
+
+=item B<COLLECTOR END>
+
+The B<COLLECTOR END> command ends the definition of a collector.  Following
+a B<COLLECTOR END> command, top-level commands are again accepted.
+
+=item B<PORT> I<PORT>
+
+This command specifies the network port the collector should collect flow
+data.  The command may only be present when the B<COLLECTOR-TYPE>
+is I<TCP> or I<UDP>.
+
+=item B<HOST> I<hostname>
+
+This optional command specifies the IP or name of the host the collector
+should listen on (bind(2) to).  Its value is the name of the host or its
+IP address.  The command may only be present when the B<COLLECTOR-TYPE>
+is I<TCP>, I<UDP>, or I<SPREAD>.  If I<SPREAD>, then B<HOST> is the hostname
+that the Spread Daemon is running on. The default is to listen on localhost.
+
+
+=item B<PATH> I<file path>
+
+This command specifies the file or directory path the collector should
+read from.  If the B<COLLECTOR-TYPE> is I<FILEHANDLER> this should be the
+name of the IPFIX file to read and process.  Otherwise, if the type is I<DIR>
+or I<FILEHANDLER> and the B<POLL> keyword is present, B<PATH> should be
+the directory path in which to poll files.
+
+=item B<POLL> I<POLL-TIME>
+
+This command specifies the time (seconds) between directory polls if the collector
+is defined as a I<DIR> type.  Also, if the collector is a I<FILEHANDLER> and
+this keyword is present, the B<PATH> keyword will be translated as directory
+path, and the B<super_mediator> will run forever.  The default is 30 seconds.
+
+=item B<DAEMON>
+
+This specifies the name of the Spread Daemon to connect to.  This keyword
+is only valid if B<COLLECTOR_TYPE> is B<SPREAD>.
+
+=item B<GROUP>
+
+This specifies one and only one Spread Group Name to subscribe to. This keyword
+is only valid if B<COLLECTOR_TYPE> is B<SPREAD>. It is acceptable to have
+multiple GROUP keywords in the Collector block.
+
+=item B<LOCK>
+
+When this command is given, B<super_mediator> will not read files that have
+".lock" appended to the filename.  This keyword is only valid if the
+collector is setup to poll a directory.  It is useful if B<yaf(1)> is
+writing to rotating IPFIX files and the B<super_mediator> is reading from
+that same directory.  This prevents the B<super_mediator> from pulling the
+file out from under B<yaf(1)> while it is still being written to.  Note this
+is different from how the B<super_mediator> will lock export files.  See
+B<LOCK> under the EXPORTER concept.
+
+=item B<MOVE> I<FILE_PATH>
+
+When this command is given and B<super_mediator> is configured to poll a
+directory for IPFIX files, it will move the processed files to
+the I<FILE_PATH>.  You must specify either B<MOVE> or B<DELETE> for a collector
+if it is polling from a directory.
+
+=item B<DELETE>
+
+When this command is given, B<super_mediator> will delete the IPFIX files
+after they have been processed.  If you don't want to delete the files, use
+the B<MOVE> keyword.
+
+=item B<DECOMPRESS_DIRECTORY> I<FILE PATH>
+
+If present and the input file(s) are compressed (gzip'd),
+decompress the file to a temporary file within I<FILE_PATH>.  If
+If this option is not present, super_mediator will decompress
+files to the variable specified by the TMPDIR environment variable
+or /tmp if TMPDIR is not set.  The zlib library must be installed
+to use this feature.
+
+=item B<AND_FILTER>
+If present, I<AND> all filters in the COLLECTOR block.  All filters
+must pass for B<super_mediator> to collect the record.
+
+=item B<Collector Filters>
+
+Each collector can contain one or more OR filters to define what data should
+be collected.  The syntax for the filters is the same as
+defined below in the Filter Block.  The filters defined in the collector block
+are only for the collector that contains them.  The filters are by default
+OR filters.  Use B<AND_FILTER> to make the filters AND filters. If a filter
+block is defined outside a COLLECTOR block, the filter will apply to all
+defined COLLECTORS.  A filter statement should be not be listed directly before
+the "COLLECTOR END" statement.
+See Examples.
+
+=back
+
+=head2 Filter Block
+
+The use of filter blocks is optional.  They are used to filter out certain
+flows on collection.  One and only filter block can be specificied in the
+configuration file.  However, more than one filter statement can be defined
+in the filter block.
+
+The first command below is used at the top-level to begin a filter block,
+and the remaining commands are accepted within the filter block.
+
+=over 4
+
+=item B<FILTER>
+
+A filter block starts with the B<FILTER> keyword on a single line, and it
+continues to the S<B<FILTER END>> command. There is no argument to the
+B<FILTER> command.
+
+Filters are composed of comparisons.
+In each filter block, each comparison appears on a line by itself.
+If B<any> comparison in a filter returns a match or success, the flow record
+is sent through to the exporters.  If none of the comparisons match, the
+flow record is dropped by the B<super_mediator>.  By default,
+all filters in B<super_mediator> are OR
+filters; they only have to pass one comparison to succeed.  If the user
+wants to make the filters "AND" filters, they can use the B<AND_FILTER> keyword
+in the FILTER block or EXPORTER block.  When the B<AND_FILTER> keyword is
+present, all filters have to pass to succeed.
+
+Each comparison is made up of three elements: a flow record field, an
+operator, and a compare value.  A comparison is considered a match for a record
+if the expression created by replacing the field name with the field's value
+is true.
+
+=over 1
+
+=item Available Fields
+
+All the following fields can be used to filter data.
+
+=over 1
+
+=item ANY_IP
+
+Either the source IPv4 Address or destination IPv4 Address.
+
+=item ANY_PORT
+
+Either the source port or destination port.
+
+=item SIP_V4
+
+The source IPv4 Address.
+
+=item DIP_V4
+
+The destination IPv4 Address.
+
+=item SPORT
+
+The source port.
+
+=item DPORT
+
+The destination port.
+
+=item PROTOCOL
+
+The IP Protocol.  This is an integer, where 6 is TCP, 17 is UDP.
+
+=item APPLICATION
+
+The service port of the record as set by B<yaf(1)>'s numAppLabel field.
+For example, this would be 80 if B<yaf(1)> recognizes the packets as being
+part of an HTTP session.  See B<applabel(1)>.
+
+=item SIP_V6
+
+The source IPv6 Address.
+
+=item DIP_V6
+
+The destination IPv6 Address.
+
+=item ANY_IP6
+
+Either the source or destination IPv6 Address.
+
+=item OBDOMAIN
+
+The observation domain of the B<yaf(1)> process as specified by
+B<--observation-domain> on the B<yaf(1)> command line.  If not specified, the
+observationDomainId defaults to 0.  This could be used to distinguish between
+multiple B<yaf(1)> processes.
+
+=item VLAN
+
+The VLAN tag of the flow.
+
+=item VERSION
+
+The IP Version of the Flow.  Valid values are 6 and 4.  If sourceIPv6Address
+or destinationIPv6Address exists, version is 6.
+
+=item COLLECTOR
+
+This is only valid for EXPORTER filters.  It is invalid within a COLLECTOR
+block and ignored in a FILTER block.  It can be used with B<==> or B<!=>
+operators and set to a COLLECTOR_NAME.  If present, it will only export flows
+that were collected by that COLLECTOR.
+
+=back
+
+=item Operators and Compare Values
+
+There are eight operators that are supported.  The operator determines the
+form that the compare value takes.
+
+=over 1
+
+=item ==
+
+Succeeds when the value from the record is equal to the compare value.
+
+=item !=
+
+Succeeds when the value from the record is not equal to the compare value.
+
+=item <
+
+Succeeds when the value from the record is strictly less than the compare
+value.
+
+=item <=
+
+Succeeds when the value from the record is less than or equal to the
+compare value.
+
+=item >
+
+Succeeds when the value from the record is strictly greater than the compare
+value.
+
+=item >=
+
+Succeeds when the value from the record is greater than or equal to the
+compare value.
+
+=item IN_LIST
+
+Succeeds when the value from the record belongs to the given IPset.  This
+operator is only valid for IP Addresses and IPsets.  This operator is only
+valid of B<super_mediator> is compiled with SiLK IPset support.  The IPset
+must be a valid IPset.  To compare any IP address (v4 or v6) use ANY_IP, SIP,
+or DIP.
+
+=item NOT_IN_LIST
+
+Succeeds when the value from the record does not belong to the given IPset.
+This operator is only valid for IP Addresses and IPsets.  This operator is
+only valid if B<super_mediator> is compiled with SiLK IPset support.  The IPset
+must be a valid IPset.  To compare any IP address (v4 or v6) use ANY_IP, SIP,
+or DIP.
+
+=back
+
+=back
+
+=item B<AND_FILTER>
+
+If present, all filters listed in the FILTER block must pass in
+order to succeed.  By default, all filters in B<super_mediator> are
+"OR" filters.
+
+=item B<FILTER END>
+
+The B<FILTER END> command ends the definition of a group.  Following a
+B<FILTER END> command, top-level commands are again accepted.
+
+=back
+
+=head3 Filter Example: Filter on DNS Traffic:
+
+=over 1
+
+    FILTER
+        APPLICATION == 53
+    FILTER END
+
+=back
+
+=head3 Filter Example: Filter on Ports 80 OR 53:
+
+=over 1
+
+    FILTER
+        ANY_PORT == 80
+        ANY_PORT == 53
+    FILTER END
+
+=back
+
+=head3 Filter Example: Filter for IP(s) in IPset:
+
+=over 1
+
+    FILTER
+        SIP IN_LIST "/data/sets/mysample.set"
+    FILTER END
+
+=back
+
+=head3 Filter Example: Filter for IPv6 Address(es) in IPset:
+
+=over 1
+
+    FILTER
+        SIP_V6 IN_LIST "/data/sets/mysamplev6.set"
+    FILTER END
+
+=back
+
+=head3 Filter Example: Filter for DNS labeled traffic not on port 53:
+
+=over 1
+
+    FILTER
+        APPLICATION == 53
+        DPORT != 53
+        AND_FILTER
+    FILTER END
+
+=back
+
+
+=head2 Exporter Block
+
+The configuration file must contain at least one exporter.  However, it can
+contain multiple exporters.  The exception is that it can only contain one
+Spread Exporter.
+
+=over 4
+
+=item B<EXPORTER> I<EXPORTER_TYPE> I<EXPORTER_NAME>
+
+The B<EXPORTER> command begins a new Exporter block and it continues to the
+S<B<EXPORTER END>> command.  The I<EXPORTER_NAME> is optional and will be
+used in the log if it is provided.  The required argument to the
+B<EXPORTER> command is the I<EXPORTER_TYPE>.  It must be one of the following:
+
+=over 4
+
+=item B<TCP>
+
+The exporter will send IPFIX via TCP to the specified hostname or IP address
+and port.
+
+=item B<UDP>
+
+The exporter will send IPFIX via UDP to the specified hostname or IP address
+and port.  Note that UDP is not recommended, as it is not a reliable
+transport protocol, and thus cannont guarantee delivery of messages.  The
+B<super_mediator> will periodically send out templates as specified by the
+B<UDP_TEMP_TIMEOUT> keyword.
+
+=item B<SPREAD>
+
+The exporter will send IPFIX via Spread to the groups defined in the Exporter
+and Group blocks.
+
+=item B<FILEHANDLER>
+
+The exporter will write IPFIX to a file. If the B<ROTATE> keyword is present,
+the exporter will rotate output files every so many seconds.  Rotated IPFIX
+files will have the file suffix, ".med".
+
+=item B<TEXT>
+
+The exporter will write delimited text to a file or JSON if the keyword JSON is present
+within the EXPORTER block.  Options present within the
+EXPORTER block will vary the format of the output.  If the B<ROTATE> keyword is
+present, the exporter will rotate output files every I<ROTATE_SECONDS> seconds.
+Text flow data files, by default, will be in the form
+(text wrapped for readability):
+
+    start-time | end-time | dur | rtt | protocol | srcip | \
+    srcport | pkt | oct | attributes | mac | dstip | dstport | \
+    rpkt | roct | rev-attributes | dstmac | iflags | uflags | \
+    riflags | ruflags | tcpseq | revtcpseq | ingress| egress |
+    vlan | app | tos | end-reason | collector | payload | revpayload
+
+start-time and end-time are in the form C<2012-01-28 13:12:32.786>.  Using the
+included program, B<super_table_creator>, which is available if mysql is installed,
+you can create a MySQL table for the full flow, by running B<super_table_creator> with
+C<--flow-only>.
+
+Unless B<FLOW_ONLY> is present, a TEXT Exporter will write every IPFIX field
+it decodes into the file given to PATH, as well as B<yaf>
+process statistics records.  Statistics records will be labeled
+with the word C<stats> and are in the following form
+(text wrapped for readability):
+
+    stats | total_flows | total_packets | dropped_packets | \
+    ignored_packets | expired_fragments | assembled_fragments |\
+    flush_events | flow_table_peak_count | sensor_IP | \
+    process_id | mean_flow_rate | mean_pkt_rate
+
+B<Example:>
+
+    stats|2|56|0|0|0|0|2|1|127.0.0.1|0|131|3685
+
+If DPI data exists with the flow,
+B<super_mediator> will write one line of flow data in the above format
+followed by a flow index line and one or more lines
+containing the DPI meta data.
+
+B<Example EXPORTER TEXT configuration:>
+
+    EXPORTER TEXT
+       PATH "/data/flow.txt"
+    EXPORTER END
+
+B<Example output with above configuration:>
+
+    2012-04-03 04:42:55.606|2012-04-03 04:45:13.738| 138.132|   0.088|  6| 10.10.1.102| 2592| 30| 1591|00|00:00:00:00:00| 10.10.34.130| 7000| 24| 8001|00|00:00:00:00:00|  S| APRF|  AS| AP|b3332bea|ead9dce8|000| 194|000|000|
+    irc|125|NICK nickname
+    irc|125|USERHOST Omega
+    irc|125|VERSION mIRC v6
+    irc|125|NAMESX
+    stats|2|56|0|0|0|0|2|1|10.20.11.51|0|131|3685
+
+If B<DPI_ONLY> is
+present, the line of flow data will condensed to the following format
+and labeled with the word C<flow> by default (text wrapped for readability):
+
+    flow | flow_key_hash | start-time-ms | srcip | dstip | \
+    protocol | srcport | dstport | vlan | obid
+
+B<Example:>
+
+    flow|109074684|1207197775606|10.10.1.102|10.10.34.130|6|2592|7000|0|0
+
+=over 4
+
+=item B<flow_key_hash> is a 32-bit hash of the 5-tuple + vlan.
+
+=item B<start-time-ms> is the milliseconds since Epoch time.
+
+=back
+
+For all protocols except DNS, SSL/TLS, and DNP3 the output follows the following format.
+Each line contains the default table name, information element id,
+flow key hash, flow start time in milliseconds, observation domain id, and the data.
+There will be one line for each data field associated with the flow
+(text wrapped for readability):.
+
+    table_name | element_id | data
+
+If B<DEDUP_PER_FLOW> is present for a TEXT EXPORTER, the format for each DPI
+line will be (see below for a description of B<DEDUP_PER_FLOW>):
+
+    table_name | element_id | hitcount | data
+
+If B<DPI_ONLY> is present for a TEXT EXPORTER, any DPI data associated
+with the flow will have the following form (note that B<DPI_ONLY> adds the
+flow_key_hash, start_time_ms, and observation domain id to the DPI data):
+
+    table-name | flow_key_hash | start_time_ms | obid | elem_id | data
+
+If B<DPI_ONLY> and B<DEDUP_PER_FLOW> are both present, the format will have
+the following form:
+
+    table-name | flow_key_hash | start_time_ms | obid | elem_id | hitcount | data
+
+B<Example EXPORTER TEXT config with DPI_ONLY:>
+
+=over 2
+
+    EXPORTER TEXT
+        PATH "/data/flow.txt"
+        DPI_ONLY
+    EXPORTER END
+
+=back
+
+B<Example Output with above config:>
+
+     http|1441601726|1207802496583|115|http://en.wikipedia.org/wiki/Http
+     http|1441601726|1207802496583|114|HTTP/1.0
+     http|1441601726|1207802496583|114|HTTP/1.0
+     http|1441601726|1207802496583|117|en.wikipedia.org
+     flow|1441601726|1207802496583|128.237.224.172|208.80.152.2|6|1360|80|0
+
+B<Example EXPORTER TEXT config with DPI_ONLY and DEDUP_PER_FLOW:>
+
+=over 2
+
+    EXPORTER TEXT
+        PATH "/data/flow.txt"
+        DPI_ONLY
+	DEDUP_PER_FLOW
+    EXPORTER END
+
+=back
+
+B<Example Output with above config:>
+
+     http|1441601726|1207802496583|115|1|http://en.wikipedia.org/wiki/Http
+     http|1441601726|1207802496583|114|2|HTTP/1.0
+     http|1441601726|1207802496583|117|1|en.wikipedia.org
+     flow|1441601726|1207802496583|128.237.224.172|208.80.152.2|6|1360|80|0
+
+See below for a list of information element ids and the default table names.
+See yafdpi(1) for descriptions of each of the information elements.
+The default flow index and table names can be configured in the DPI_CONFIG block.
+The DPI_CONFIG block will also configure the B<super_mediator> to write
+only particular information elements.
+
+The format of the DNS CSV output is as follows (Note: This is different
+from the de-duplicated DNS output):
+
+    table_name | QR | dnsID | section | nxdomain | authoritative | \
+    response_type | ttl | name | value
+
+=over 4
+
+=item B<QR> denotes if the record is a Query(Q) or a Response(R).
+
+=item The B<dnsID> is the transaction ID from the DNS record.
+
+=item B<section> is the section of the packet the resource record was extracted from (0-Query,1-Answer,2-Name Server,3-Additional).
+
+=item B<nxdomain> denotes if the record was an NXDomain(1) or not(0).
+
+=item B<authoritative> denotes if the response is from an authoritative name server (1) or not (0).
+
+=item The B<response_type> is the TYPE field of the DNS resource record.
+
+=item B<ttl> is the time to live from the resource record.
+
+=item B<name> is the Query or Response Name.
+
+=item B<value> is the RDATA field from the resource record.
+
+=back
+
+B<DNS Example with DPI_ONLY:>
+
+    flow|114422227|1207802496560|128.237.224.172|128.2.1.10|17|1599|53|0
+    dns|114422227|1207802496560|0|Q|14728|0|0|0|1|0|meta.wikimedia.org.
+
+B<yaf> version 2.3.0 changed the format of X.509 Certificate export.  If using
+version 2.3.0 or later, the format of TLS/SSL CSV will be as follows:
+
+    table_name | elem_id | [I|S|E] | cert seq no. | data
+
+Note that SSL Certificate Extension fields are only exported if specifically
+set in the B<SSL_CONFIG> block.
+
+=over 4
+
+=item B<elem_id> is the object identifier as given in the X.509 ASN.1 RelativeDistinguishedName sequence. A list of common identifiers are listed below with the element ID numbers.
+
+=item B<ISE> denotes if the data came from an Issuer Field(I), Subject Field(S),
+or Extension Field (E). For fields that are not associated with the issuer, subject, or extension but describe other characteristics of the certificate,
+an I will be used (for example, not-before or not-after timestamps).
+
+=item B<cert seq no> signifies which certificate the data came from in the certificate chain. Usually, this field will contain a 0, 1, or 2.
+
+=back
+
+DNP3.0 also has a different format.  DNP3.0 will be written in
+the following form:
+
+    table_name | elem_id [284] | dnp src addr | dnp dst addr | \
+    dnp function | dnp data
+
+=over 4
+
+=item dnp B<elem_id> will always be 284.
+
+=item B<dnp src addr> is the source address found in the packet payload.
+
+=item B<dnp dst addr> is the destination address found in the packet payload.
+
+=item B<dnp function> is the function code describing the function of the following
+dnp data.
+
+=item B<dnp data> is the bytes captured by the regular expression executed by
+yaf written in hexadecimal.
+
+=back
+
+modbus and ethernet/IP data will also be written in hexadecimal.
+
+As of B<yaf> version 2.3.0, B<yaf> can export enhanced flow metrics when
+running B<yaf> with C<--flow-stats>.  By default, B<super_mediator> will
+print the flow-stats to the TEXT file given to PATH.  flow-stats will be
+written in the following form (text wrapped for readability) and will directly
+follow the flow they refer to:
+
+    flowstats | tcpUrgTotalCount | smallPacketCount | nonEmptyPacketCount | \
+    dataByteCount | averageInterarrivalTime | \
+    firstNonEmptyPacketSize | largePacketCount | maxPacketSize |\
+    firstEightNonEmptyPacketDirections | \
+    standardDeviationPayloadLength | \
+    standardDeviationInterarrivalTime | \
+    averagePacketSize | reverseTcpUrgTotalCount | \
+    reverseSmallPacketCount | reverseNonEmptyPacketCount | \
+    reverseDataByteCount | reverseAverageInterarrivalTime | \
+    reverseFirstNonEmptyPacketSize | reverseLargePacketCount | \
+    reverseMaxPacketSize | reverseStandardDeviationPayloadLength |\
+    reverseStandardDeviationInterarrivalTime | reverseAveragePayloadLength
+
+For descriptions of these information elements, see the B<yaf> man page.
+
+B<FlowStats Example:>
+
+    flowstats|0|1|1|49|0|49|0|49|00|0|0|49|0|0|0|0|0|0|0|0|0|0|0|0
+
+For a more custom TEXT output, use the B<FIELDS> keyword.  See the documentation below.
+
+=back
+
+=item B<EXPORTER END>
+
+The B<EXPORTER END> command ends the definition of an exporter.  Following an
+B<EXPORTER END> command, top-level commands are again accepted.
+
+=item B<PORT> I<PORT>
+
+Specifies the port the exporter should write to. This command may only be
+present when the B<EXPORTER_TYPE> is I<TCP> or I<UDP>.
+
+=item B<HOST> I<HOST>
+
+Specifies the hostname or IP address of the collector to which the flows
+should be exported.  If the B<EXPORTER_TYPE> is I<SPREAD> and the Spread
+daemon is running on a remote host, B<HOST> should specify the host name or IP
+address the Spread daemon is running on.
+
+=item B<PATH> I<PATH>
+
+Specifies the name of the file to write to, or the directory to write rolling
+IPFIX or TEXT Files if B<ROTATE> is defined.
+
+=item B<DAEMON> I<SPREAD_DAEMON_NAME>
+
+Specifies the name of the Spread Daemon the exporter should connect to.
+
+=item B<GROUP> I<GROUP_NAME>
+
+The Spread Group name the exporter should publish messages to.  Only one group
+name per line.  Each exporter can have multiple B<GROUP> commands.  To set a
+filter for each Spread Group, use the Group Block.
+
+=item B<LOCK>
+
+If specified, B<super_mediator> will prepend "." to a file that it is
+currently writing to.  This is can be used with rwsender,
+so that rwsender doesn't move the file out from
+under the B<super_mediator>.  Once the file is closed, the dot will be
+removed from the filename.
+
+=item B<DELIMITER> I<DELIMITER>
+
+If specified, B<super_mediator> will use the single character I<DELIMITER> to
+separate flow fields when writing to a text file.  The default is C<|>.  Only
+valid for TEXT Exporters.
+
+=item B<DPI_DELIMITER> I<DELIMITER>
+
+If specified, B<super_mediator> will use the single character I<DELIMITER> to
+separate DPI fields when writing to a text file.  If not specified, the
+I<DELIMITER> is the same as B<DELIMITER> above, which by default is C<|>.
+Using a different delimiter than above will potentially cause two different
+delimiters to be used on the same line.  This may be useful when uploading
+text files to a database with the desire to use one column for DPI fields.
+Only valid for TEXT Exporters.
+
+=item B<ROTATE> I<ROTATE_SECONDS>
+
+If specified, rotate output files every I<ROTATE_SECONDS>.  Only valid for
+FILEHANDLER Exporters.  If the B<super_mediator> is not receiving any flow
+data, files will not be rotated.  B<super_mediator> uses flow end time in the
+incoming flow records to determine the current time and when to rotate files.
+Text filenames use the flow end time when rotating files for indexing purposes.
+If I<MULTI_FILES> is present, by default C<super_mediator> will rotate files
+using a serial number, not a timestamp in the filename.  If I<TIMESTAMP_FILES>
+is present, it will timestamp the files instead of using the serial number.
+IPFIX Exporters use system time when rotating files.
+
+=item B<GZIP_FILES>
+
+When this command is present, B<super_mediator> will compress the output
+files after it is done writing to them, if gzip is available.
+
+=item B<MOVE> I<FILE_DIRECTORY>
+
+When this command is present, B<super_mediator> will move the output files
+to I<FILE_DIRECTORY>, which must be a valid file directory,
+after it is done writing to them.
+
+=item B<UDP_TEMP_TIMEOUT> I<TIMEOUT_MINS>
+
+If specified, send templates out 3 times in I<TIMEOUT_MINS>.  By default, as
+per the recommendations in RFC 5101, B<super_mediator> will retransmit
+templates three times within 10 minutes.
+
+=item B<NO_FLOW>
+
+If present, do not forward basic flow records to this EXPORTER.  This is
+typically used if other de-duplication features are enabled.  Flow export
+is enabled by default unless B<SSL_DEDUP_ONLY>, B<DEDUP_ONLY>, B<STATS_ONLY>,
+B<DNS_DEDUP_ONLY>, B<DNS_RR_ONLY> or B<NO_FLOW> is present.
+
+=item B<FLOW_ONLY>
+
+If specified, only forward basic flow information to the exporter.  This should
+be used with SiLK collectors, such as rwflowpack or flowcap, as they do not
+collect Deep Packet Inspection data.  If present, B<super_mediator>
+will not forward or write stats messages.
+
+=item B<DPI_ONLY>
+
+If specified, only export flows that have some Deep Packet Inspection data
+associated with it.  If the exporter has I<EXPORTER_TYPE> of B<TEXT>, the
+B<super_mediator> will write a flow index line and associated DPI data
+to the output file. (See above B<TEXT> for format and examples).
+B<super_mediator> will not write stats messages.  For advanced
+configuration of the DPI to CSV export use the DPI_CONFIG block.
+
+=item B<DNS_RESPONSE_ONLY>
+
+If present, only export DNS responses.  This will ignore all DNS queries.
+This option is ignored if no DNS DPI data is present in the flow.
+
+=item B<MULTI_FILES>
+
+Only valid if B<DPI_ONLY> is also present.  Only valid for TEXT Exporters.
+If present, the B<super_mediator> will separate DPI data based on application
+protocol into separate files in the file directory given to B<PATH>,
+which must exist prior to starting the B<super_mediator>.  For
+advanced configuration of the filenames, edit the DPI_CONFIG block.  This is
+useful if the B<mysqlimport> tool will be loading the CSV output from the
+B<super_mediator>.  The B<mysqlimport> tool loads tables from text files.  The
+base name of the text file must be the name of the table that should be used.
+For a list of the default table names and information elements they contain,
+see below.  If B<MULTI_FILES> is present, the CSV does not contain the
+table name.  The EXPORTER will write flow index lines in the following form to
+a separate file C<flow.txt0>:
+
+    flow_key_hash | start_time_ms | srcip | dstip | \
+    protocol | srcport | dstport | vlan | obid
+
+DPI data (all protocols except DNS, SSL, and DNP) will be written in
+the following form:
+
+    flow_key_hash | start_time_ms | ob-id | elem_id | data
+
+If DEDUP_PER_FLOW is also present, the format will be:
+
+    flow_key_hash | start_time_ms | ob-id | elem_id | count | data
+
+B<Exceptions:>
+
+DNS will be written in the following form (different from DNS_DEDUP form. DNS_DEDUP
+is not permitted if MULTI_FILES is present).  See above under B<TEXT>
+for a description of each field:
+
+    flow_key_hash | start_time_ms | obid | [Q|R] | dnsID | \
+    section | nxdomain | authoritative | response_type | \
+    ttl | name | value
+
+SSL/TLS will be written in the following form (See above under B<TEXT> for a description of each field):
+
+    elem_id | flow_key_hash | start_time_ms | obid | [I|S|E] | \
+    cert_no_seq | data
+
+DNP3.0 will be written in the following form:
+
+    elem_id | flow_key_hash | start_time_ms | obid | \
+    dnpsrcaddress | dnpdstaddress | dnpfunction | dnpdata
+
+RTP will be written in the following form:
+
+    elem_id | flow_key_hash | start_time_ms | obid |
+    payloadType | reversePayloadType
+
+Flow-stats will be written as described above, except the line will not include the table name [flowstats].
+
+B<Example EXPORTER MULTI_FILES Configuration:>
+
+    EXPORTER TEXT
+        PATH "/data/dpi"
+        DPI_ONLY
+        MULTI_FILES
+        ROTATE 600
+        LOCK
+    EXPORTER END
+
+B<Example Data in C</data/dpi/flow.txt0>>:
+
+    109074684|1207197775606|10.10.1.102|10.10.34.130|6|2898|7000|0|0
+
+B<Example Data in C</data/dpi/irc.txt0>:>
+
+    109074684|1207197775606|0|125|NICK OmegaT
+    109074684|1207197775606|0|125|USERHOST OmegaT
+    109074684|1207197775606|0|125|VERSION mIRC v6
+
+In the above example, the three lines were written to C<irc.txt0> because
+information element id 125 has the default label C<irc>.  The default
+labels are listed below.  They can be modified in the DPI_CONFIG block.
+The files will rotate if ROTATE is present in the EXPORTER Block.
+The files will "lock" if LOCK is present in the EXPORTER Block.
+Enclosed with the B<super_mediator> distribution is B<super_table_creator>,
+a program that creates the default MySQL tables for
+default B<super_mediator> CSV output.
+The following is an example of using the B<super_table_creator> and
+B<mysqlimport> tool with B<super_mediator> output:
+
+C<super_table_creator -n username -p password -d super_db>
+
+C<mysqlimport -u user -p --fields-terminated-by="|" super_db irc.txt0>
+
+Alternatively, you can use the MySQL C<LOAD DATA INFILE> command
+to load the first three columns from a file into the "super" database:
+
+C<mysql -u user -p -e "LOAD DATA INFILE '/data/dpi/flow.txt0' into table super_flows FIELDS TERMINATED by '|' (column1, column2, column3);" super>
+
+B<super_mediator> can also be configured to do the importing if the MySQL
+client libraries are installed and if the MySQL
+credentials are listed in the EXPORTER block.  The EXPORTER block must
+have B<MYSQL_USER>, B<MYSQL_PASSWORD>, and B<MYSQL_DATABASE> all present
+for B<super_mediator> to attempt the import.  B<super_mediator> uses the
+default database schemas used by the B<super_table_creator>.  B<super_table_creator>
+contains schemas for all DPI protocols, DNS-deduplication, and flow.
+
+If B<NO_INDEX> is also present in the EXPORTER BLOCK, the B<super_mediator>
+will not write to a flow index file.  For each line in the DPI files, the
+flow key hash will be expanded into its components and the timestamp will
+be printed in human-readable format (text wrapped for readability):
+
+    start-time | srcip | dstip | protocol | srcport | \
+    dstport | vlan | obid | elem_id | data
+
+B<Example:>
+
+    2008-04-10 04:41:36.583|1.2.3.4|5.6.7.8|6|1360|80|0|0|114|HTTP/1.1
+
+The follow example shows an example configuration file and sample data using
+the B<NO_INDEX> and B<TIMESTAMP_FILES> options:
+
+B<Example NO_INDEX Exporter Configuration:>
+
+    EXPORTER TEXT
+        PATH "/data/dpi"
+        DPI_ONLY
+        MULTI_FILES
+        ROTATE 600
+        LOCK
+        TIMESTAMP_FILES
+        NO_INDEX
+    EXPORTER END
+
+B<Example Data in C</data/dpi/http.txt20080410044142>:>
+
+    2008-04-10 04:41:36.582|1.2.3.4|5.6.7.8|6|1359|80|0|0|111|Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 5.1; Maxthon; .NET CLR 1.1.4322; .NET CLR 2.0.50727)
+    2008-04-10 04:41:36.582|1.2.3.4|5.6.7.8|6|1359|80|0|0|112|/w/index.php?
+    2008-04-10 04:41:36.582|1.2.3.4|5.6.7.8|6|1359|80|0|0|114|HTTP/1.1
+
+B<Example Data in C</data/dpi/dns.txt20110128215727>:>
+
+    2011-01-28 21:52:23.473|1.2.3.4|6.7.8.9|17|49664|53|905|0|Q|525|0|0|0|1|0|www.dropbox.com
+
+=item B<NO_STATS>
+
+If preset, the exporter will not write or forward stats messages from B<yaf(1)>.
+
+=item B<STATS_ONLY>
+
+If present, the exporter will write or forward only stats messages from B<yaf(1)>.
+If this is present after the B<DPI_ONLY> or B<FLOW_ONLY> keywords, it will
+turn on stats messages in the exporter.  The stats messages will not be prefaced
+"stats|".  Instead they will be prefaced with "\N|" so that when they are imported
+into a database, the timestamp field will be updated to the current time.
+
+=item B<DNS_DEDUP>
+
+If present, the B<super_mediator> will perform DNS de-duplication of B<yaf(1)>
+IPFIX flow records with DNS information and write
+the aggregated DNS records to the exporter. B<Super_mediator> will also
+write previously de-duplicated DNS records that are received in the following
+format. DNS de-duplicated records for TEXT exporters have the format:
+
+    first_seen | rrtype | rrname | rrval
+
+first_seen is a timestamp in the form C<2012-01-23 04:45:13.897>.  B<DNS_DEDUP>
+is not valid if B<MULTI_FILES> is also present.  It is recommended to
+separate the DNS_DEDUP and MULTI_FILES into separate exporters.  See
+super_mediator(1) for a complete description of the information elements
+exported for IPFIX Exporters.
+
+=item B<DNS_DEDUP_ONLY>
+
+If present, B<super_mediator> will only write DNS de-duplicated records
+to this exporter.  It will not write any flow or other Deep Packet Inspection
+data that it collects.  Not valid if B<MULTI_FILES>, B<SSL_DEDUP_ONLY>,
+B<DEDUP_ONLY>, <DNS_RR_ONLY>, or <FLOW_ONLY> is also present.
+
+=item B<DNS_RR_ONLY> I<FULL>
+
+If present, B<super_mediator> will only write DNS resource records
+to this exporter.  It will not write any flow or other Deep Packet Inspection
+data that it collects.  These records are not de-duplicated. Every
+DNS resource record that B<super_mediator> receives will be transmitted.
+Not valid if B<MULTI_FILES>, B<SSL_DEDUP_ONLY>, B<DEDUP_ONLY>, or
+B<FLOW_ONLY> is also present.
+The IPFIX Information Elements that are exported are as follows (in order).
+The exporter will only export the following fields labeled with I<FULL> if
+the word I<FULL> is present in the configuration file:
+
+=over 2
+
+=item B<flowStartMilliseconds> IE 152, 8 octets, unsigned
+
+Flow start time in milliseconds since 1970-01-01 00:00:00 UTC. Always present.
+
+=item B<sourceIPv6Address> IE 27, 16 octets, unsigned, I<FULL>
+
+IPv6 address of flow source or biflow initiator. Present for IPv6
+flows or IPv6-mapped IPv4 flows only.
+
+=item B<destinationIPv6Address> IE 28, 16 octets, unsigned, I<FULL>
+
+IPv6 address of flow source or biflow responder. Present for IPv6
+flows or IPv6-mapped IPv4 flows only.
+
+=item B<sourceIPv4Address> IE 8, 4 octets, unisigned, I<FULL>
+
+IPv4 address of flow source or biflow initiator. Present for IPv4
+flows without IPv6-mapped addresses only.
+
+=item B<destinationIPv4Address> IE 12, 4 octets, unsigned, I<FULL>
+
+IPv4 address of flow source or biflow responder. Present for IPv4
+flows without IPv6-mapped addresses only.
+
+=item B<dnsTTL> CERT (PEN 6871) IE 199, 4 octets, unsigned
+
+DNS Time To Live.  This is an unsigned integer that specifies the time interval, in seconds, that the resource record may be cached for.
+This will contain a value of zero for DNS Queries
+
+=item B<observationDomainId> IE 149, 4 octets, unsigned
+
+An identifier of an Observation Domain that is locally unique to an Exporting Process. This is typically set on the B<yaf(1)> command line.
+
+=item B<flowKeyHash> CERT (PEN 6871) IE 106, 4 octets, unsigned
+
+The hash of the 5-tuple (sourceIPAddress, destinationIPAddress, sourcePort,
+destinationPort, protocol) and vlanId.
+
+=item B<dnsQRType> CERT (PEN 6871) IE 175, 2 octets, unsigned
+
+DNS Query/Response Type.  This corresponds with the QTYPE field in the DNS Question Section or the TYPE field in the DNS Resource Record Section.
+This field determines the type of data found in the dnsRName field..
+
+=item B<sourceTransportPort> IE 7, 2 octets, unsigned, I<FULL>
+
+TCP or UDP port on the flow source or biflow initiator endpoint.
+Always present.
+
+=item B<destinationTransportPort> IE 11, 2 octets, usigned, I<FULL>
+
+TCP or UDP port on the flow destination or biflow responder endpoint.
+Always present. For ICMP flows, contains ICMP type * 256 + ICMP code.
+This is non-standard, and an open issue in B<yaf>.
+
+=item B<vlanId> IE 58, 2 octets, unsigned, I<FULL>
+
+802.1q VLAN tag of the first packet in the forward direction of the flow.
+
+=item B<dnsID> CERT (PEN 6871) IE 226, 2 octets, unsigned
+
+DNS Transaction ID.  This identifier is used by the requester to match up replies to outstanding queries
+
+=item B<protocolIdentifier> IE 4, 1 octet, unsigned, I<FULL>
+
+IP protocol of the flow.
+
+=item B<dnsQueryResponse> CERT (PEN 6871) IE 174, 1 octet, unsigned
+
+DNS Query/Response header field.  This corresponds with the DNS header one bit field, QR.  If the message is a query (0), or a response (1).
+
+=item B<dnsAuthoritative> CERT (PEN 6871) IE 176, 1 octet, unsigned
+
+DNS Authoritative header field.  This corresponds with the DNS header one bit field, AA.  This bit is only valid in responses (when B<dnsQueryResponse> is 1), and specifies that the responding name server is an authority for the domain name in the question section.
+
+=item B<dnsNXDomain> CERT (PEN 6871) IE 177, 1 octet, unsigned
+
+DNS NXDomain or Response Code (RCODE).  This corresponds with the DNS RCODE header field.  This field will be set to 3 for a Name Error, 2 for a Server Failure, 1 for a Format Error, and 0 for No Error. See http://www.iana.org/assignments/dns-parameters for other valid values.
+
+=item B<dnsRRSection> CERT (PEN 6871) IE 178, 1 octet, unsigned
+
+DNS Resource Record Section Field.  This field will be set to 0 if the information is from the Question Section, 1 for the Answer Section, 2 for the Name Server Section, and 3 for the Additional Section.
+
+=item B<dnsQName> CERT (PEN 6871) IE 179, variable length
+
+A DNS Query or Response Name.  This field corresponds with the QNAME field in the DNS Question Section or the NAME field inthe DNS Resource Record Section.
+
+=item B<dnsRName> CERT (PEN 6871) IE 927, variable length
+
+The DNS Resource Record Data field. The information contained in this field
+depends on the type of resource record. For an A record, this will be the
+resolving IPv4 Address.  For an AAAA record, this will be the resolving IPv6
+Address. For a NS record, it will be the NSDNAME. For a CNAME Record, this
+will contain a CNAME.  For a SOA Record, this will contain the SOA MNAME field.
+For a PTR Record, this will contain the PTRDNAME. For a MX Record, this will
+contain the MX Exchange field. For a TXT Record, this will contain the
+TXT-DATA field.  For a SRV Record, this will contain the Target field.
+
+=back
+
+=item B<DNS_RR> I<FULL>
+
+If present, B<super_mediator> will write DNS resource records
+to this exporter. These records are not de-duplicated. Every
+DNS resource record that B<super_mediator> receives will be exported.
+The IPFIX Information Elements that are exported as described above
+under B<DNS_RR_ONLY>.  The option I<FULL> keyword will export the
+additional 5-tuple. Only valid for IPFIX Exporters.
+
+If present for
+
+=item B<FIELDS> I<FIELDS>
+
+If present for TEXT Exporters, the B<super_mediator> will write only the
+fields contained in I<FIELDS>.  I<FIELDS> contains the list of flow attributes
+(a.k.a. fields or columns) to print.  The columns will be displayed in the
+order the fields are specified (DPI is the exception).  Fields my be repeated.
+FIELDS is a comma or space separated list of field-names or field-integers.
+Field-names are case-insentive. Example:
+
+    FIELDS stime,ETIME,0,1,SPORT,DPORT,dpi
+
+YAF process statistics are not enabled by default when a FIELD
+list is specified.  Use STATS_ONLY to enable stats with
+custom field lists.
+
+The complete list of built-in fields that B<super_mediator> supports follows:
+
+=over 1
+
+=item SIP,sip,0
+
+source IP address
+
+=item DIP,dip,1
+
+destination IP address
+
+=item SPORT,sport,4
+
+source port for TCP and UDP.  For ICMP flow, ICMP type.
+
+=item DPORT,dport,5
+
+destination port for TCP and UDP.  For ICMP flows, ICMP code.
+
+=item PROTOCOL,protocol,6
+
+IP protocol
+
+=item APPLICATION,application,7
+
+application label as reported by yaf.
+
+=item OBDOMAIN,domain,13
+
+observation domain from IPFIX header.
+
+=item VLAN,vlan,15
+
+vlan ID, exported in hexadecimal. See VLANINT for integer version.
+
+=item FLOWKEYHASH,hash,16
+
+flow key hash of the 5 tuple.  Used to correlate flows.
+
+=item DURATION,dur,17
+
+flow duration in fractional seconds.
+
+=item STIME,stime,18
+
+Flow start time in ISO 8601 format, with milliseconds (YYYY-MM-DD hh:mm:ss.ssss).
+
+=item ETIME,etime,19
+
+Flow end time in ISO 8601 format, with milliseconds (YYYY-MM-DD hh:mm:ss.ssss).
+
+=item STIMEMS,stimems,20
+
+Flow start time in milliseconds since 1970-01-01 00:00:00 UTC.
+
+=item ETIMEMS,etimems,21
+
+Flow end time in milliseconds since 1970-01-01 00:00:00 UTC.
+
+=item SIP_INT,sipint,22
+
+Source IP address as a 32-bit integer.
+
+=item DIP_INT,dipint,23
+
+Destination IP address as a 32-bit integer.
+
+=item RTT,rtt,24
+
+Round-trip time estimate in fractional seconds.
+
+=item PACKETS,pkts,25
+
+Forward packet count.
+
+=item RPACKETS,rpkts,26
+
+Reverse Packet count.
+
+=item BYTES,bytes,27
+
+Forward octet count.
+
+=item RBYTES,rbytes,28
+
+Reverse octet count.
+
+=item IFLAGS,iflags,29
+
+Forward first-packet TCP flags where each flags bit is represented by the first character in the flag's name: B<F>IN, B<S>YN, B<R>ST, B<P>SH, B<A>CK, B<U>RG, B<E>CE, B<C>WR.
+
+=item RIFLAGS,riflags,30
+
+Reverse first-packet TCP flags where each flags bit is represented by the first character in the flag's name: B<F>IN, B<S>YN, B<R>ST, B<P>SH, B<A>CK, B<U>RG, B<E>CE, B<C>WR.
+
+=item UFLAGS,uflags,31
+
+Forward I<n>th-packet TCP flags union where each flags bit is represented by the first character in the flag's name: B<F>IN, B<S>YN, B<R>ST, B<P>SH, B<A>CK, B<U>RG, B<E>CE, B<C>WR.
+
+=item RUFLAGS,ruflags,32
+
+Reverse I<n>th-packet TCP flags union where each flags bit is represented by the first character in the flag's name: B<F>IN, B<S>YN, B<R>ST, B<P>SH, B<A>CK, B<U>RG, B<E>CE, B<C>WR.
+
+=item ATTRIBUTES,attributes,33
+
+Flow attributes in hexadecimal format.
+
+=item RATTRIBUTES,rattributes,34
+
+Reverse Flow attributes in hexadecimal format.
+
+=item MAC,mac,35
+
+source MAC address.
+
+=item DSTMAC,dstmac,36
+
+destination MAC address.
+
+=item TCPSEQ,tcpseq,37
+
+Forward initial TCP sequence number in hexadecimal format.
+
+=item RTCPSEQ,rtcpseq,38
+
+Reverse initial TCP sequence number in hexadecimal format.
+
+=item ENTROPY,entropy,39
+
+The Shannon-Fano Entropy for the forward flow.
+
+=item RENTROPY,rentropy,40
+
+The Shannon-Fano Entropy for the reverse flow.
+
+=item ENDREASON,endreason,41
+
+If not present, the flow ended normally (i.e., by TCP RST or FIN).
+Otherwise it is one of the following:
+
+=over 5
+
+=item B<idle>
+
+Flow was expired by idle timeout. No packets were received for
+I<IDLE_TIMEOUT> seconds (see yaf(1)) and the flow was presumed closed.
+
+=item B<active>
+
+Flow was expired by active timeout. The flow's duration was longer than
+I<ACTIVE_TIMEOUT> seconds (see yaf(1)) and the flow was flushed from the
+flow table.
+
+=item B<eof>
+
+Flow was still active in the flow table at the end of the dumpfile or at
+yaf(1) shutdown time; it was flushed as the flow table was cleared.
+
+=item B<rsrc>
+
+Flow was prematurely flushed as B<idle> because more than I<FLOW_TABLE_MAX>
+flows (see yaf(1)) were active in the flow table.
+
+=item B<force>
+
+B<yaf> forced a write of the flow, but the flow remained open.
+
+=back
+
+=item OSNAME,osname,42
+
+p0f OS Name for the forward flow.
+
+=item OSVERSION,osversion,43
+
+p0f OS Version for the forward flow.
+
+=item ROSNAME,rosname,44
+
+p0f OS Name for the reverse flow.
+
+=item ROSVERSION,rosversion,45
+
+p0f OS Version for the reverse flow.
+
+=item FINGERPRINT,fingerprint,46
+
+p0f OS Fingerprint for the forward flow.
+
+=item RFINGERPRINT,rfingerprint,47
+
+p0f OS Fingerprint for the reverse flow.
+
+=item DHCPFP,dhcpfp,48
+
+DHCP Fingerprint, usually OS or Hardware name.
+
+=item DHCPVC,dhcpvc,49
+
+DHCP Vendor class ID found in Option 60 of the DHCP packet.
+
+=item RDHCPFP,rdhcpfp,50
+
+DHCP Fingerprint for reverse flow.
+
+=item RDHCPVC,rdhcpvc,51
+
+DHCP Vendor class ID found in Option 60 of the DHCP packet for the reverse flow.
+
+=item INGRESS,ingress,52
+
+The index of the IP interface where packets of the flow were received.
+
+=item EGRESS,egress,53
+
+The index of the IP interface where packets in the reverse
+direction of the flow were received.
+
+=item DATABYTES,databytes,54
+
+dataByteCount field in flow statistics. See yaf(1).
+
+=item RDATABYTES,rdatabytes,55
+
+reverseDataByteCount field in flow statistics. See yaf(1).
+
+=item ITIME,itime,56
+
+averageInterarrivalTime field in flow statistics in fractional seconds. See yaf(1).
+
+=item RITIME,ritime,57
+
+reverseAverageInterarrivalTime field in flow statistics in fractional seconds. See yaf(1).
+
+=item STDITIME,stditime,58
+
+standardDeviationInterarrivalTime field in flow statistics. See yaf(1).
+
+=item RSTDITIME,rstditime,59
+
+reverseStandardDeviationInterarrivalTime field in flow statistics. See yaf(1).
+
+=item TCPURG,tcpurg,60
+
+tcpUrgTotalCount field in flow statistics. See yaf(1).
+
+=item RTCPURG,rtcpurg,61
+
+reverseTcpUrgTotalCount field in flow statistics. See yaf(1).
+
+=item SMALLPKTS,smallpkts,62
+
+smallPacketTotalCount field in flow statistics. See yaf(1).
+
+=item RSMALLPKTS,rsmallpkts,63
+
+reverseSmallPacketTotalCount field in flow statistics. See yaf(1).
+
+=item LARGEPKTS,largepkts,64
+
+largePacketCount field in flow statistics. See yaf(1).
+
+=item RLARGEPKTS,rlargepkts,65
+
+reverseLargePacketCount field in flow statistics. See yaf(1).
+
+=item NONEMPTYPKTS,nonemptypkts,66
+
+nonEmptyPacketCount field in flow statistics. See yaf(1).
+
+=item RNONEMPTYPKTS,rnonemptypkts,67
+
+reverseNonEmptyPacketCount field in flow statistics. See yaf(1).
+
+=item MAXSIZE,maxsize,68
+
+maxPacketSize field in flow statistics. See yaf(1).
+
+=item RMAXSIZE,rmaxsize,69
+
+reverseMaxPacketSize field in flow statistics. See yaf(1).
+
+=item STDPAYLEN,stdpaylen,70
+
+standardDeviationPayloadLength field in flow statistics. See yaf(1).
+
+=item RSTDPAYLEN,rstdpaylen,71
+
+reverseStandardDeviationPayloadLength field in flow statistics. See yaf(1).
+
+=item FIRSTEIGHT,firsteight,72
+
+firstEightNonEmptyPacketDirections field in flow statistics in hexadecimal format. See yaf(1).
+
+=item DPI,dpi,73
+
+Deep Packet Inspection information.  For all protocols,
+except DNS and TLS/SSL, adding B<DPI> to the field list will add
+the information element id and data value to the end of the line regardless
+of what order B<DPI> is in the list. DPI information will B<always> be at the
+end of the line.   For each DPI field captured
+by YAF, there will be one line in the output text file.  To configure the DPI fields
+B<super_mediator> exports, use the DPI_FIELD_LIST or the DPI_CONFIG block options.
+If both DPI_FIELD_LIST and DPI_CONFIG are present in the configuration file, the elements
+listed in the DPI_FIELD_LIST will take priority for that particular exporter.
+All protocols except DNS and SSL will add the following columns to the end of the line:
+
+    elem_id | data
+
+For DNS, the following fields will be added to the end of the line:
+
+    QR | dnsID | section | nxdomain | authoritative | \
+    response_type | ttl | name | value
+
+For SSL, the following fields will be added to the end of the line:
+
+    elem_id | IS | cert seq no. | data
+
+See above (under TEXT) for explanations of the fields.
+
+=item VLANINT,vlanint,74
+
+The VLAN tag of the flow exported as an integer.
+
+=item TOS,tos,75
+
+The Type of Service field from the IP Header.
+
+=item RTOS,rtos,76
+
+The Type of Service field from the IP header of the reverse flow.
+
+=item MPLS1,mpls1,77
+
+The top of stack MPLS label.
+
+=item MPLS2,mpls2,78
+
+The second MPLS label in the stack.
+
+=item MPLS3,mpls3,79
+
+The third MPLS label in the stack.
+
+=item COLLECTOR,collector,80
+
+The name of the collector that received the flow.
+
+=item FIRSTNONEMPTY,firstnonempty,81
+
+The firstNonEmptyPacketSize field in flow statistics. See yaf(1).
+
+=item RFIRSTNONEMPTY,rfirstnonempty,82
+
+The reverseFirstNonEmptyPacketSize field in flow statistics. See yaf(1).
+
+=item MPTCPSEQ,mptcpseq,83
+
+The initial data sequence number found in the MPTCP Data Sequence Signal (DSS) option. See yaf(1)
+
+=item MPTCPTOKEN,mptcptoken,84
+
+The token used to identify an MPTCP connection over multiple subflows. This value is found
+in the MP_JOIN TCP Option for the initial SYN of a subflow. See yaf(1)
+
+=item MPTCPMSS,mptcpmss,85
+
+The maximum segement size reported in the Maximum Segment Size TCP Option. This should
+be consistent over all subflows. See yaf(1).
+
+=item MPTCPID,mptcpid,86
+
+The address ID of the subflow found in the SYN/ACK of an MP_JOIN operation. See yaf(1)
+
+=item MPTCPFLAGS,mptcpflags,87
+
+Various MPTCP Values.  See yaf(1).
+
+=item PAYLOAD,payload,88
+
+The initial n bytes of forward direction of the flow's payload.  Present if B<yaf>
+payload export is enabled.  payload is in hexdump format and are prefixed
+with the string ->.  For JSON export mode, the payload is base64-encoded.
+
+=item RPAYLOAD,rpayload,89
+
+The initial n bytes of reverse direction of the flow's payload. Present if B<yaf>
+payload export is enabled.  rpayload is in hexdump format and are prefixed
+with the string <-.  For JSON export mode, the rpayload is base64-encoded.
+
+=item DHCPOPTIONS,dhcpoptions,90
+
+A comma separated list of DHCP Options in the order they were requested. See yafdhcp(1)
+
+=item RDHCPOPTIONS,rdhcpoptions,91
+
+The comma separated list of DHCP Options in the reverse flow as they were requested. See yafdhcp(1)
+
+=item NDPI_MASTER,ndpimaster,92
+
+The NDPI Layer 7 Master protocol identified by the nDPI library via yaf(1)
+
+=item NDPI_SUB,ndpisub,93
+
+The NDPI Layer 7 Sub/secondary protocol identified by the nDPI library via yaf(1)
+
+=back
+
+=item B<DPI_FIELD_LIST> I<DPI_IE_LIST>
+
+If present for TEXT exporters, B<super_mediator> will only export DPI information elements
+contained in <DPI_IE_LIST>.  The I<DPI_IE_LIST> is a list of information element ids
+from the below list (see DPI_CONFIG), separated by a comma, and surrounded by
+square brackets, [ and ].  For example, the following line will direct B<super_mediator>
+to only export HTTP user agent strings and get requests.
+
+    DPI_FIELD_LIST [111, 112]
+
+=item B<PRINT_HEADER>
+
+If present for TEXT Exporters, the B<super_mediator> will write a header for
+delimited flow data.  If files rotate, it will write one header at the
+top of each flow data file.  Ignored for custom field lists.
+
+=item B<REMOVE_EMPTY_FILES>
+
+If present for TEXT or FILEHANDLER Exporters, the B<super_mediator> will
+remove output files that have a file size of 0.  This is enabled by default.
+
+=item B<NO_INDEX>
+
+If present for TEXT Exporters, the B<super_mediator> will not write separate
+lines with flow information.  It will include the flow information in the
+following form at the beginning of each DPI data line.  The start time will
+be in human-readable format.  The flow key hash will not be printed.
+This will make the DPI files substantially larger in size.  See
+the above sample configuration and example (under MULTI_FILES).
+
+    start-time | srcip | dstip | protocol | srcport | \
+    dstport | vlan | obid
+
+=item B<TIMESTAMP_FILES>
+
+By default, the B<super_mediator> includes the timestamp (flow end time) of the first flow
+in the filename of the TEXT file, except if B<MULTI_FILES> is present. If,
+B<TIMESTAMP_FILES> is present, B<super_mediator>
+will include the timestamp in the DPI files after the file extension (e.g.
+http.txt20120606123430).  To search for a particular flow, use the flow's
+end time to determine which file contains the flow.
+
+=item B<NO_FLOW_STATS>
+
+If present for TEXT Exporters, the B<super_mediator> will not write B<yaf>
+flow-stats.  Only valid for TEXT exporters.  Ignored for any other exporter
+type.  See B<yaf(1)> Flow Statistics Template for more information.
+
+=item B<MYSQL_USER> I<USER_NAME>
+
+If present for TEXT Exporters, the B<super_mediator> will import the
+CSV file(s) to a MySQL database.  It will use I<USER_NAME> when connecting
+to the server.  B<MYSQL_DATABASE> and B<MYSQL_PASSWORD> must also
+be set for B<super_mediator> to complete uploads.
+
+=item B<MYSQL_PASSWORD> I<PASSWORD>
+
+If present for TEXT Exporters, the B<super_mediator> will import the
+CSV file(s) to a MySQL database.  It will use I<PASSWORD> when connecting
+to the server.  B<MYSQL_USER> and B<MYSQL_DATABASE> must also be
+set for B<super_mediator> to complete uploads.
+
+=item B<MYSQL_DATABASE> I<DATABASE_NAME>
+
+If present for TEXT exporters, the B<super_mediator> will import the
+CSV file(s) to the MySQL database I<DATABASE_NAME>.  It will use
+B<MYSQL_USER> and B<MYSQL_PASSWORD> when connecting to the server.  All
+three values must be set or B<super_mediator> will not try to import
+the files.
+
+=item B<MYSQL_HOST> I<HOSTNAME>
+
+If present for TEXT Exporters, the B<super_mediaotr> will import the
+CSV file(s) to the MySQL database on the server located at I<HOSTNAME>.
+If not present, and B<MYSQL_DATABASE>, B<MYSQL_USER>, and B<MYSQL_PASSWORD>
+are present, B<super_mediator> will try to import the file to the MySQL
+server running locally.
+
+=item B<MYSQL_TABLE> I<TABLE_NAME>
+
+If present for TEXT Exporters, the B<super_mediator> will import the
+CSV file(s) to the table I<TABLE_NAME>.  This is only used if B<FLOW_ONLY>
+or B<DNS_DEDUP_ONLY> is also present.  The default table name for B<FLOW_ONLY>
+data is C<flow>.  The default table name for the dns-dedup data is C<dns>.
+In order to set the table names for the
+DPI files, use the B<DPI_CONFIG> block.  Use the B<super_table_creator>
+to create the database schemas for the DNS deduplication and flow tables.
+
+B<Example of DPI Import:>
+
+    EXPORTER TEXT
+        PATH "/data/dpi"
+        DPI_ONLY
+        MULTI_FILES
+        ROTATE 600
+        LOCK
+        TIMESTAMP_FILES
+        NO_INDEX
+        MYSQL_DATABASE super_db
+        MYSQL_USER root
+        MYSQL_PASSWORD password
+    EXPORTER END
+
+B<Example of DNS_DEDUP Import:>
+
+    EXPORTER TEXT
+        PATH "/data/dns/dns_dedup"
+        DNS_DEDUP_ONLY
+        ROTATE 600
+        LOCK
+        MYSQL_DATABASE dns_dedup_db
+        MYSQL_USER root
+        MYSQL_PASSWORD password
+        MYSQL_TABLE dns
+    EXPORTER END
+
+B<Example of User-defined table names:>
+
+    EXPORTER TEXT
+        PATH "/data/dpi"
+        DPI_ONLY
+        MULTI_FILES
+        ROTATE 600
+        LOCK
+        MYSQL_DATABASE my_super_db
+        MYSQL_USER bob
+        MYSQL_PASSWORD password
+    EXPORTER END
+
+    DPI_CONFIG
+        TABLE my_http_table [111, 112, 113, 114, 115]
+        TABLE my_dns_table [1, 2, 6, 28]
+        TABLE my_dhcp_table [242, 243]
+    DPI_CONFIG END
+
+=item B<REMOVE_UPLOADED>
+
+If present and the MySQL import was successful, B<super_mediator> will remove
+the file it uploaded to the database.  This only removes files that were
+sucessfully uploaded.  B<super_mediator> does not consider MySQL warnings
+as unsuccessful.  Please be certain that the database is set up correctly,
+and the data is imported successfully before using this option.
+
+=item B<AND_FILTER>
+
+If present, I<AND> all filters in the EXPORTER block.  All filters
+must pass for B<super_mediator> to export the record.
+
+=item B<ESCAPE_CHARS>
+
+If present, B<super_mediator> will escape any control characters by placing
+a \ (backslash) in front of the character. Octal codes will be used for
+control characters.  Backslash characters that
+are present in the string will also be escaped by using a double backslash.
+B<super_mediator> will also escape the delimiter character that is
+used for the EXPORTER, "|" by default. This option is only available
+for TEXT EXPORTERS.
+
+=item B<DEDUP_PER_FLOW>
+
+If present, B<super_mediator> will deduplicate DPI fields within a flow. Often,
+B<yaf> will export multiple values for an information element that are the same.
+With this option, B<super_mediator> will only export unique values for an
+information element along with a count of how many times the value was present
+with the flow.  This only affects certain protocols such as HTTP, FTP, IMAP, RTSP,
+SIP, SMTP, SSH, IRC, POP3, MODBUS, ENIP, SLP.  The hit count for each value will be
+written in the column before the value.  For JSON exporters, DPI values will be
+de-duplicated, but B<super_mediator> will not export a hit count.
+
+=over 2
+
+    EXPORTER TEXT
+        PATH "/data/flow.txt"
+        DEDUP_PER_FLOW
+    EXPORTER END
+
+=back
+
+B<Example DPI Output with above config (third column is hit count):>
+
+     http|115|1|http://en.wikipedia.org/wiki/Http
+     http|114|2|HTTP/1.0
+     http|117|1|en.wikipedia.org
+
+=item B<JSON>
+
+If present, B<super_mediator> will write flow and DPI data in JSON format.
+B<super_mediator> will use the standard IPFIX information element as the
+key for each value present in the flow. B<JSON> cannot be combined with
+B<MULTI_FILES>. If no other keywords are present, B<JSON> exporters will export
+the same information elements as the standard B<TEXT> exporter including
+every DPI information element present in the flow.  B<JSON> can also be combined
+with B<FIELDS> to choose which fields to export in JSON format.  The standard
+root element for a flow is "flows".  The root elements will be different for
+DNS_DEDUP, SSL_DEDUP, SSL CERTIFICATE, DEDUP, or DNS_RR records.
+
+=item B<DEDUP_ONLY>
+
+If present, B<super_mediator> will only write de-duplicated DPI data. See
+the DEDUP_CONFIG block for more information on configuring data de-duplication.
+
+=item B<SSL_DEDUP_ONLY>
+
+If present, B<super_mediator> will perform SSL certificate de-duplication on
+SSL certificates received from B<yaf(1)>.  See the SSL_CONFIG block for
+more information on SSL certificate de-duplication.  If this keyword is present
+for an exporter, B<super_mediator> will only export SSL Dedup records and SSL
+certificate records.  Not valid if B<DEDUP_ONLY>, B<DNS_DEDUP_ONLY>,
+B<DNS_RR_ONLY>, or B<FLOW_ONLY> is also present.
+
+=item B<SSL_DEDUP>
+
+If present, <super_mediator> will perform SSL certificate de-duplication on SSL certificates received from B<yaf(1)>.  It will also write previously
+de-duplicated SSL records from B<super_mediator> to the EXPORTER.
+ See the SSL_CONFIG block for more information on SSL certificate
+de-duplication.
+
+=item B< SSL_CERT_HASH_SHA1>
+
+If present, B<super_mediator> will perform a SHA1 hash against the
+entire X.509 certificate, if available.  This option is only available
+if B<super_mediator> was built with OpenSSL support.  SHA1 hashing
+can also be enabled by listing 298 in the B<OTHER> I<FIELD_LIST> in
+the B<SSL_CONFIG> block. If using the MULTI_FILES option, add 298 to
+the I<TABLE_LIST> in the B<DPI_CONFIG> block.
+
+=item B< SSL_CERT_HASH_MD5>
+
+If present, B<super_mediator> will perform an MD5 hash against the
+entire X.509 certificate, if available.  This option is only available
+if B<super_mediator> was built with OpenSSL support.  MD5 hashing
+can also be enabled by listing 299 in the B<OTHER> I<FIELD_LIST> in
+the B<SSL_CONFIG> block. If using the MULTI_FILES option, add 299 to
+the I<TABLE_LIST> in the B<DPI_CONFIG> block
+
+=item B<Exporter Filters>
+
+Each exporter can contain one or more OR filters to define what data should
+be exported to the exporter.  The syntax for the filters is the same as
+defined above in the Filter Block.  The filters defined in the exporter block
+are only for the exporter that contains them.  The filters are by default
+OR filters.  Use B<AND_FILTER> to make the filters AND filters.
+See Examples.
+
+=back
+
+=head2 Group Block
+
+The information from the group block is used by the B<super_mediator> to
+determine what flow data to send each Spread Group defined in the exporter
+block.  The group blocks are optional.  If they don't exist, every Spread
+Group named in the exporter block will receive every and all flows.  If a
+filter is defined in the exporter block, every Spread Group defined in the
+exporter block will receive the flows that pass the exporter filter.  In the
+case that each Spread Group should receive some subset of the flows, a filter
+can be defined for the group in this group block.
+
+=over 4
+
+=item B<GROUP> I<GROUP_NAME>
+
+The B<GROUP> command begins a new group block and it continues to the
+S<B<GROUP END>> command.  The argument to the B<GROUP> command is the name
+of the group for which the filter is being defined.  The I<GROUP_NAME> must
+already exist in the exporter block.  Group names should not contain spaces or
+special characters.
+
+=item B<GROUP END>
+
+The B<GROUP END> command ends the definition of a group.  Following a
+B<GROUP END> command, top-level commands are again accepted.  Each Group Block
+should contain at least 1 filter.
+
+=item Group Filters
+
+The Group block contains a series of Filters that should be in the same form
+as described above in the Filter block.  See Examples.
+
+=back
+
+=head2 DNS De-duplication block
+
+The first command below is used at the top-level to begin a DNS de-duplication
+block, and the remaining commands are accepted within the dns de-duplication
+context. The information from the dns de-duplication block is used by the
+B<super_mediator> to determine how records will be flushed from the cache.
+See super_mediator(1) for a complete description of the IPFIX information
+elements exported for DNS_DEDUP records.
+
+=over 4
+
+=item B<DNS_DEDUP>
+
+The B<DNS_DEDUP> command begins a new DNS de-duplication block and it continues
+to the S<B<DNS_DEDUP END>> command.  There are no arguments to the
+B<DNS_DEDUP> command.
+
+=item B<DNS_DEDUP END>
+
+The B<DNS_DEDUP END> command ends the definition of a DNS de-duplication
+block.  Following a B<DNS_DEDUP END> command, top-level commands are again
+accepted.
+
+=item B<MAX_HIT_COUNT> I<COUNT>
+
+If present, the B<super_mediator> will flush a DNS record from the cache
+when the internal hit count reaches I<count>.  If the keyword B<LAST_SEEN> is
+also present, the B<super_mediator> will write the record.  Otherwise, the
+record will be silently flushed from the cache.  The default I<COUNT> is 500.
+The max I<COUNT> is 65535.
+
+=item B<FLUSH_TIME> I<FLUSH_SECONDS>
+
+If present, the B<super_mediator> will flush a DNS record from the cache
+when a new record has not been seen for over I<FLUSH_SECONDS>.  If the keyword
+B<LAST_SEEN> is also present in the DNS De-duplication block, the
+B<super_mediator> will write the record.  Otherwise, the record will be
+silently flushed from the cache.  The default I<FLUSH_SECONDS> is 300 seconds,
+or 5 minutes.  The max I<FLUSH_SECONDS> is 65535, or approx. 18 hours.
+
+=item B<LAST_SEEN>
+
+If present, the B<super_mediator> will write records when they are flushed,
+rather than when they are first seen.  The records will also contain a
+last_seen time and a hit count.  If B<LAST_SEEN> is present, the output will
+be in the following format:
+
+    first_seen | last_seen | rrtype | rrname | hitcount | rrval
+
+first_seen and last_seen are timestamps in the form C<2012-01-23 04:45:13.897>.
+
+=item B<BASE64_ENCODE>
+
+If present, the B<super_mediator> will BASE 64 Encode the domain names in the
+DNS records.  It will only BASE 64 Encode names for TEXT Exporters.
+
+=item B<RECORDS> I<DNS_RESOURCE_RECORD_TYPE_LIST>
+
+If present, B<super_mediator> will dedup on resource record types contained
+contained in I<DNS_RESOURCE_RECORD_TYPE_LIST>.  The I<DNS_RESOURCE_RECORD_TYPE_LIST>
+is a list of resource record types, separated by a comma, and surrounded by
+square brackets, [ and ].  For example, the following line will direct B<super_mediator>
+to only dedup on A Records and NS Records. Resource record types available are 0 for
+NXDomains and 1, 2, 5, 6, 12, 15, 16, 28, 33.
+
+    RECORDS [1, 2]
+
+=item B<MAP(I<MAPNAME>)>
+
+By default, B<super_mediator> hashes the DNS resource record name to store
+and aggregate DNS resource records.  In addition to the name, B<super_mediator>
+can aggregate the data per VLAN ID (or group of VLAN IDs) or per Observation
+Domain ID (or group of Observation domains) with a VLAN_MAP or OBID_MAP.
+To use a VLAN_MAP or OBID_MAP in addition to the resource record name
+key use MAP(I<MAPNAME>).  The VLAN_MAP or OBID_MAP with I<MAPNAME>
+must be defined before the DNS_DEDUP block in the configuration file.
+If a MAP is used, then a TEXT record will include an extra column at the end
+of the line with the I<MAPNAME> and an IPFIX record will contain an additional
+information element I<observationDomainName> with the name of the MAP.
+
+    VLAN_MAP x
+       S1 [1, 2, 3]
+       S2 [6]
+       DISCARD_OTHER
+    VLAN_MAP END
+
+    DNS_DEDUP test
+        MAP(x)
+    DNS_DEDUP END
+
+=item B<ADD_EXPORTER_NAME>
+
+If present, B<super_mediator> will add an extra column onto the TEXT record
+with the name of the EXPORTER associated with DNS_DEDUP block.  If the
+EXPORTER is an IPFIX EXPORTER, the I<observationDomainName> IE field will be
+populated with the exporter name.  This option is ignored if a MAP is also
+defined for this EXPORTER.
+
+=back
+
+=head2 DPI Configuration Block
+
+The first command below is used at the top-level to begin a DPI configuration
+block, and the remaining commands are accepted within the DPI config
+context. The information from the dpi config block is used by the
+B<super_mediator> to determine how to write the DPI data in the text files, or
+if B<MULTI_FILES> is present in the EXPORTER block, it determines the filenames
+of the CSV files that contain the DPI data.  If a DPI_CONFIG block is present,
+it will be used for all exporters that are exporting DPI Information (it does
+not effect DNS deduplication exporters).  For example, if an exporter is using
+a custom field list B<FIELDS>, and B<DPI> is an item in that list, it will only
+write flows that contain a DPI element that is listed in the DPI_CONFIG block.
+However, if the B<DPI_FIELD_LIST> keyword is also present in the exporter, the
+B<DPI_FIELD_LIST> takes precedence over the B<DPI_CONFIG> items.
+
+=over 4
+
+=item B<DPI_CONFIG> I<INDEX_NAME>
+
+The B<DPI_CONFIG> command begins a new DPI config block and it continues
+to the S<B<DPI_CONFIG END>> command.  The I<INDEX_NAME> is an optional
+argument to the B<DPI_CONFIG> command.  If I<INDEX_NAME> is present, the
+table name or filename for the flow index information will have the name
+I<INDEX_NAME>.  If not present, the default C<flow> will be used.
+
+=item B<DPI_CONFIG_END>
+
+The B<DPI_CONFIG_END> command ends the definition of B<DPI_CONFIG> block.
+Following the B<DPI_CONFIG_END> command, top-level commands are accepted.  Only
+one B<DPI_CONFIG> block is permitted in a configuration file.
+
+=item B<TABLE> I<TABLE_NAME> I<TABLE_LIST>
+
+If B<TABLE> is present, label the lines that contain information element ids
+in the I<TABLE_LIST> with the word I<TABLE_NAME>.  I<TABLE_NAME> should not
+contain spaces.  The I<TABLE_LIST> is a list
+of information element ids from the below list, separated by a comma, and
+surrounded by square brackets, [ and ].  The following example will label the
+lines that contain user agent strings (id 111), with "http_ua":
+
+    TABLE http_ua [111]
+
+The following list contains the default information element ids and their
+respective table name label (see yafdpi(1) for a description of each information
+element):
+
+=over 2
+
+      information element name  | id     | table label
+
+      osName                    | 36     | p0f
+
+      osVersion                 | 37     | p0f
+
+      osFingerPrint             | 107    | p0f
+
+      httpServerString          | 110    | http
+
+      httpUserAgent             | 111    | http
+
+      httpGet                   | 112    | http
+
+      httpConnection            | 113    | http
+
+      httpVersion               | 114    | http
+
+      httpReferer               | 115    | http
+
+      httpLocation              | 116    | http
+
+      httpHost                  | 117    | http
+
+      httpContentLength         | 118    | http
+
+      httpAge                   | 119    | http
+
+      httpAccept                | 120    | http
+
+      httpAcceptLanguage        | 121    | http
+
+      httpContentType           | 122    | http
+
+      httpResponse              | 123    | http
+
+      httpCookie                | 220    | http
+
+      httpSetCookie             | 221    | http
+
+      pop3TextMessage           | 124    | pop3
+
+      ircTextMessage            | 125    | irc
+
+      tftpFilename              | 126    | tftp
+
+      tftpMode                  | 127    | tftp
+
+      slpVersion                | 128    | slp
+
+      slpMessageType            | 129    | slp
+
+      slpString                 | 130    | slp
+
+      ftpReturn                 | 131    | ftp
+
+      ftpUser                   | 132    | ftp
+
+      ftpPass                   | 133    | ftp
+
+      ftpType                   | 134    | ftp
+
+      ftpRespCode               | 135    | ftp
+
+      imapCapability            | 136    | imap
+
+      imapLogin                 | 137    | imap
+
+      imapStartTLS              | 138    | imap
+
+      imapAuthenticate          | 139    | imap
+
+      imapCommand               | 140    | imap
+
+      imapExists                | 141    | imap
+
+      imapRecent                | 142    | imap
+
+      rtspURL                   | 143    | rtsp
+
+      rtspVersion               | 144    | rtsp
+
+      rtspReturnCode            | 145    | rtsp
+
+      rtspContentLength         | 146    | rtsp
+
+      rtspCommand               | 147    | rtsp
+
+      rtspContentType           | 148    | rtsp
+
+      rtspTransport             | 149    | rtsp
+
+      rtspCSeq                  | 150    | rtsp
+
+      rtspLocation              | 151    | rtsp
+
+      rtspPacketsReceived       | 152    | rtsp
+
+      rtspUserAgent             | 153    | rtsp
+
+      rtspJitter                | 154    | rtsp
+
+      sipInvite                 | 155    | sip
+
+      sipCommand                | 156    | sip
+
+      sipVia                    | 157    | sip
+
+      sipMaxForwards            | 158    | sip
+
+      sipAddress                | 159    | sip
+
+      sipContentLength          | 160    | sip
+
+      sipUserAgent              | 161    | sip
+
+      smtpHello                 | 162    | smtp
+
+      smtpFrom                  | 163    | smtp
+
+      smtpTo                    | 164    | smtp
+
+      smtpContentType           | 165    | smtp
+
+      smtpSubject               | 166    | smtp
+
+      smtpFilename              | 167    | smtp
+
+      smtpContentDisposition    | 168    | smtp
+
+      smtpResponse              | 169    | smtp
+
+      smtpEnhanced              | 170    | smtp
+
+      smtpSize                  | 222    | smtp
+
+      sshVersion                | 171    | ssh
+
+      nntpResponse              | 172    | nntp
+
+      nntpCommand               | 173    | nntp
+
+      sslCipher                 | 185    | tls
+
+      sslClientVersion          | 186    | tls
+
+      sslServerCipher           | 187    | tls
+
+      sslCompressionMethod      | 188    | tls
+
+      sslCertVersion            | 189    | tls
+
+      sslCertSignature          | 190    | tls
+
+      sslCertIssuerCountryName* | 191    | tls
+
+      sslCertIssuerOrgName*     | 192    | tls
+
+      sslCertIssuerOrgUnitName* | 193    | tls
+
+      sslCertIssuerZipCode*     | 194    | tls
+
+      sslCertIssuerState*       | 195    | tls
+
+      sslCertIssuerCommonName*  | 196    | tls
+
+      sslCertIssuerLocalityName*| 197    | tls
+
+      sslCertIssuerStreetAddress*| 198    | tls
+
+      sslCertSubCountryName*    | 200    | tls
+
+      sslCertSubOrgName*        | 201    | tls
+
+      sslCertSubOrgUnitName*    | 202    | tls
+
+      sslCertSubZipCode*        | 203    | tls
+
+      sslCertSubState*          | 204    | tls
+
+      sslCertSubCommonName*     | 205    | tls
+
+      sslCertSubLocalityName*   | 206    | tls
+
+      sslCertSubStreetAddress*  | 207    | tls
+
+      sslCertSerialNumber       | 244    | tls (in hexadecimal)
+
+      sslCertValidityNotBefore  | 247    | tls
+
+      sslCertValidityNotAfter   | 248    | tls
+
+      sslPublicKeyAlgorithm     | 249    | tls
+
+      sslPublicKeyLength        | 250    | tls
+
+      sslRecordVersion          | 288    | tls
+
+      sslServerName             | 294    | tls
+
+      sslCertificateHash        | 295    | tls (in hexadecimal)
+
+      sslCertificate            | 296    | tls (Base64 encoded)
+
+      sslCertificateMD5         | 299    | tls (in hexadecimal)
+
+      sslCertificateSHA1        | 298    | tls (in hexadecimal)
+
+      mysqlUsername             | 223    | mysql
+
+      mysqlCommandText          | 225    | mysql
+
+      dhcpFingerPrint           | 242    | dhcp
+
+      dhcpVendorCode            | 243    | dhcp
+
+      httpAuthorization         | 252    | http
+
+      httpVia                   | 253    | http
+
+      httpX-Forwarded-For       | 254    | http
+
+      httpExpires               | 255    | http
+
+      httpRefresh               | 256    | http
+
+      httpIMEI                  | 257    | http
+
+      httpIMSI                  | 258    | http
+
+      httpMSISDN                | 259    | http
+
+      httpSubscriber            | 260    | http
+
+      httpAcceptCharset         | 261    | http
+
+      httpAcceptEncoding        | 262    | http
+
+      httpAllow                 | 263    | http
+
+      httpDate                  | 264    | http
+
+      httpExpect                | 265    | http
+
+      httpFrom                  | 266    | http
+
+      httpProxyAuthentication   | 267    | http
+
+      httpUpgrade               | 268    | http
+
+      httpWarning               | 269    | http
+
+      httpDNT                   | 270    | http
+
+      httpX-Forwarded-Proto     | 271    | http
+
+      httpX-Forwarded-Host      | 272    | http
+
+      httpX-Forwarded-Server    | 273    | http
+
+      httpX-DeviceID            | 274    | http
+
+      httpX-Profile             | 275    | http
+
+      httpLastModified          | 276    | http
+
+      httpContentEncoding       | 277    | http
+
+      httpContentLanguage       | 278    | http
+
+      httpContentLocation       | 279    | http
+
+      httpX-UA-Compatible       | 280    | http
+
+      dnp3ObjectData            | 284    | dnp (in hexadecimal)
+
+      modbusData                | 285    | modbus (in hexadecimal)
+
+      ethernetIPData            | 286    | enip (in hexadecimal)
+
+      rtpPayloadData            | 287    | rtp
+
+=back
+
+Not all fields are turned on by default in YAF.  See the yafDPIRules.conf
+to turn on/off certain fields.
+
+*These items were removed as of YAF 2.3.0.  SSL Certificate information
+elements were replaced by the X.509 object identifier value.  B<Use id 443 in
+I<TABLE_LIST> or I<DPI_FIELD_LIST> to include all of the following elements.
+To specify individual fields, use the SSL_CONFIG block>  Below
+is a list of common objects in an X.509 RelativeDistinguishedName Sequence
+(not all possibilities are listed):
+
+=over 2
+
+      object identifier name  | id     | table label
+
+      common name             | 3      | tls
+
+      countryName             | 6      | tls
+
+      localityName            | 7      | tls
+
+      stateOrProvinceName     | 8      | tls
+
+      streetAddress           | 9      | tls
+
+      organization            | 10     | tls
+
+      organizational unit     | 11     | tls
+
+      title                   | 12     | tls
+
+      postalCode              | 17     | tls
+
+      name                    | 41     | tls
+
+=back
+
+DNS has a different format.  I<TABLE_LIST> should contain the DNS Resource
+Record Types in the below list:
+
+=over 2
+
+      Q/R Record Type           | id      | default table name
+
+      A Record                  | 1       | dns
+
+      NS Record                 | 2       | dns
+
+      CNAME Record              | 5       | dns
+
+      SOA Record                | 6       | dns
+
+      MX Record                 | 12      | dns
+
+      PTR Record                | 15      | dns
+
+      TXT Record                | 16      | dns
+
+      AAAA Record               | 28      | dns
+
+      SRV Record                | 33      | dns
+
+      DS Record*                | 43      | dns
+
+      RRSIG Record**            | 46      | dns
+
+      NSEC Record**             | 47      | dns
+
+      DNSKEY Record*            | 48      | dns
+
+      NSEC3 Record*             | 50      | dns
+
+      NSEC3PARAM Record*        | 51      | dns
+
+      All Others***             | 53      | dns
+
+=back
+
+*Records that do not contain data for the rdata field.
+
+**RRSIG Type records contain the signer name in the rdata field.  NSEC Type records
+contains the next domain name in the rdata field.
+
+***Any nonstandard query response type, such as 251 - Incremental Transfers,
+can be filtered by using 53.
+
+=back
+
+=head2 SSL_CONFIG block
+
+The first command below is used at the top-level to begin a SSL_CONFIG
+block, and the remaining commands are accepted within the SSL DPI
+context. The information from the SSL_CONFIG block is used by
+B<super_mediator> to determine which SSL/TLS X.509 certficates to export
+(for TEXT exporters).  This block can be used in conjunction with the
+DPI_FIELD_LIST. If this block is present, all other SSL/TLS fields
+will be disabled and only elements present in one of the ISSUER, SUBJECT, OTHER,
+and EXTENSIONS lists will be exported.  See below for an example of use.
+To export SSL de-deduplication information in IPFIX, use the SSL_DEDUP_ONLY
+in the EXPORTER block.  The SSL_CONFIG block only applies to TEXT Exporters.
+This block can also be used to configure incoming de-duplicated SSL records
+from another B<super_mediator>.
+
+=over 4
+
+=item B<SSL_CONFIG> I<EXPORTER_NAME>
+
+The B<SSL_CONFIG> command begins a new SSL_CONFIG block and it continues
+to the S<B<SSL_CONFIG END>> command.  The only required argument to the
+B<SSL_CONFIG> command is the I<EXPORTER_NAME> for which this SSL configuration
+applies.  This should match the name of one and only one TEXT
+EXPORTER from the configuration file.  The SSL_CONFIG block should be
+placed after the EXPORTER block for which it refers to.
+
+=item B<SSL_CONFIG END>
+
+The B<SSL_CONFIG END> command ends the definition of a SSL_CONFIG
+block.  Following a B<SSL_CONFIG END> command, top-level commands are again
+accepted.
+
+=item B<ISSUER> I<FIELD_LIST>
+
+If present, B<super_mediator> will only write certain
+X.509 object identifier values specified in I<FIELD_LIST> from
+the ISSUER x.509 RelativeDistinguishedName Sequence.
+The I<FIELD_LIST> is a list of X.509 RelativeDistinguishedName Sequence
+object IDs, separated by a comma, and surrounded by square brackets,
+[ and ].  A list of common object IDs is listed above under the
+DPI_CONFIG block. The default behavior is to print all issuer
+fields, however if any list (ISSUER, SUBJECT, OTHER, EXTENSIONS) is
+present in the SSL_CONFIG block, B<super_mediator> will only print
+the elements specifically denoted in the I<FIELD_LIST>. To print all
+elements use B<[*]> to denote all elements.
+
+=item B<SUBJECT> I<FIELD_LIST>
+
+If present, B<super_mediator> will only write certain
+X.509 object identifier values specified in I<FIELD_LIST> from
+the SUBJECT x.509 RelativeDistinguishedName Sequence.
+The I<FIELD_LIST> is a list of X.509 RelativeDistinguishedName Sequence
+object IDs, separated by a comma, and surrounded by square brackets,
+[ and ].  A list of common object IDs is listed above under the
+DPI_CONFIG block. The default behavior is to print all subject
+fields, however if any list (ISSUER, SUBJECT, OTHER, EXTENSIONS) is
+present in the SSL_CONFIG block, B<super_mediator> will only print
+the elements specifically denoted in the I<FIELD_LIST>. To print all
+elements use B<[*]> to denote all elements.
+
+=item B<OTHER> I<FIELD_LIST>
+
+If present, B<super_mediator> will only write certain
+SSL/TLS information elements specified in I<FIELD_LIST>.
+The I<FIELD_LIST> is a list of information element IDs, separated
+by a comma, and surrounded by square brakets, [ and ].  A list
+of SSL/TLS Information Element IDs is listed above under
+the DPI_CONFIG block (valid elements have a label of tls).
+The default behavior is to print all "other"
+fields, however if any list (ISSUER, SUBJECT, OTHER, EXTENSIONS) is
+present in the SSL_CONFIG block, B<super_mediator> will only print
+the elements specifically denoted in the I<FIELD_LIST>. To print all
+elements use B<[*]> to denote all elements. If the full X.509
+certificate is available and if openSSL is available,
+B<super_mediator> has the ability
+to perform a MD5 or SHA1 hash of the certificate.  To print these
+values, list 299 (MD5) or 298 (SHA1) in the I<FIELD_LIST>.
+B<super_mediator> can also Base64 encode the full X.509
+certificate, if available.  To export the Base64 encoded
+certificate, add 296 to the B<OTHER> I<FIELD_LIST>.
+
+=item B<EXTENSIONS> I<FIELD_LIST>
+
+If present, B<super_mediator> will write particular
+extension types from the SSL/TLS certificate specified in I<FIELD_LIST>.
+The I<FIELD_LIST> is a list of X.509 RelativeDistinguishedName
+Sequence object IDs, separated by a comma, and surrounded by square
+brackets, [ and ].  A list of acceptable object IDs is listed below.
+B<super_mediator> will only export extension types if they are
+specifically listed within the SSL_CONFIG block.  Some extension
+types contain a sequence of values. Each element in the sequence
+will be exported on a separate line. The default behavior is to print all extension
+fields, however if any list (ISSUER, SUBJECT, OTHER, EXTENSIONS) is
+present in the SSL_CONFIG block, B<super_mediator> will only print
+the elements specifically denoted in the I<FIELD_LIST>. To print all
+elements use B<[*]> to denote all elements. The accepted extension types are:
+
+=over 2
+
+      extension type         | id
+
+      subjectKeyIdentifier   | 14*
+
+      keyUsage               | 15*
+
+      privateKeyUsagePeriod  | 16*
+
+      subjectAltName         | 17
+
+      issuerAltName          | 18
+
+      certificateIssuer      | 29
+
+      cRLDistributionPoints  | 31
+
+      certificatePolicies    | 32*
+
+      * denotes when B<super_mediator> writes the value in hex.
+
+=back
+
+=item B<SSL_DEDUP>
+
+If present, B<super_mediator> will perform de-duplication of SSL certificates
+received from B<yaf(1)>. It
+will take SSL Certificate information collected by B<yaf(1)> and output
+the certificate information once and cache the serial number and issuer
+name for each certificate. Certificates received matching the serial number
+and issuer tuple after initial export will simply increment the internal
+counters.  Certificates in the cache are flushed based on the default values
+or the values configured in the SSL_CONFIG block. A SSL de-duplication record
+will be exported either when the internal hit count reaches 5000 or when the
+record has been in the cache for 5 minutes.  These parameters are configurable
+by setting MAX_HIT_COUNT or FLUSH_TIME within the SSL_CONFIG block. The SSL
+de-duplication record has the following format (in IPFIX):
+
+=over 2
+
+=item B<flowStartMilliseconds> IE 152, 8 octets, unsigned
+
+The first time this certificate was seen (start time of the flow that contained
+this certificate).
+
+=item B<flowEndMilliseconds> IE 153, 8 octets, unsigned
+
+The last time this certificate was seen (start time of the flow that contained
+this certificate).
+
+=item B<observedDataTotalCount> CERT (PEN 6871) IE 929, 8 octets, unsigned
+
+The number of times this certificate was seen in the time period.
+
+=item B<sslCertSerialNumber> CERT (PEN 6871) IE 244, variable length
+
+The serial number of the X.509 Certificate.
+
+=item B<sslCertIssuerCommonName> CERT (PEN 6871) IE 196, variable length
+
+The common name of the Issuer (Certificate Authority) in the X.509 Certificate.
+
+=back
+
+The CSV format of the SSL dedup record is as follows:
+
+    fseen | lseen | serial | hitcount | issuer
+
+The SSL certificates exported will follow the same IPFIX format as described in B<yafdpi(1)>.  The text format for SSL certificates is as follows:
+
+    serial | issuer | stime | id | ISE | cert_no | data
+
+B<Serial> is the serial number in hexadecimal.  B<Issuer> is the common name
+(id-at 3) of the X.509 Issuer (Certificate Authority).  If no common name is
+present, the organizational unit name is used (id-at 11). B<stime> is the time
+in milliseconds that the certificate was first seen.  B<id> is the object/member
+ID for the X.509 RelativeDistinguishedName Sequence.  A list of common objects
+can be found above. If ISSUER, SUBJECT, OTHER, or EXTENSION field lists are
+present within the SSL_CONFIG block, B<super_mediator> will only print objects
+that are present within the field lists. B<ISE> denotes if the data came from an Issuer Field(I),
+Subject Field(S), or Extension Field (E). For fields that are not associated
+with the issuer, subject, or extension but describe other characteristics of
+the certificate, an I will be used (for example, not-before or not-after
+timestamps).
+B<cert seq no> signifies which certificate the data came from in the
+certificate chain. Usually, this field will contain a 0, 1, or 2.
+
+=item B<MAX_HIT_COUNT> I<COUNT>
+
+If present, the B<super_mediator> will flush a SSL record from the cache
+when the internal hit count reaches I<count>.  The default I<COUNT> is 5000.
+
+=item B<FLUSH_TIME> I<FLUSH_SECONDS>
+
+If present, the B<super_mediator> will flush a SSL record from the cache
+when a new record has not been seen for over I<FLUSH_SECONDS>.
+B<super_mediator> will write the record when it is flushed.
+The default I<FLUSH_SECONDS> is 300 seconds, or 5 minutes.
+
+=item B<CERT_FILE> I<FILENAME>
+
+If present, B<super_mediator> will write SSL certificates in the above format
+to the file path provided by I<FILENAME>.  This option is only valid for TEXT
+Exporters (not JSON). The file will be rotated or locked if those options
+are configured in the EXPORTER block associated with the SSL_CONFIG block.
+
+=item B<MAP(I<MAPNAME>)>
+
+By default, B<super_mediator> hashes the SSL Certificate Serial Number and Issuer Name to store
+and aggregate SSL Certificates.  In addition to the serial number, B<super_mediator>
+can aggregate the data per VLAN ID (or group of VLAN IDs) or per Observation
+Domain ID (or group of Observation domains) with a VLAN_MAP or OBID_MAP.
+To use a VLAN_MAP or OBID_MAP in addition to the serial number/issuer name
+key use MAP(I<MAPNAME>).  The VLAN_MAP or OBID_MAP with I<MAPNAME>
+must be defined before the SSL_CONFIG block in the configuration file.
+If a MAP is used, then a TEXT record will include an extra column at the end
+of the line with the I<MAPNAME> and an IPFIX record will contain an additional
+information element I<observationDomainName> with the name of the MAP.
+
+    OBID_MAP x
+       S1 [1, 2, 3]
+       S2 [6]
+       DISCARD_OTHER
+    OBID_MAP END
+
+    SSL_CONFIG test
+        MAP(x)
+    SSL_CONFIG END
+
+=item B<ADD_EXPORTER_NAME>
+
+If present, B<super_mediator> will add an extra column onto the TEXT record
+with the name of the EXPORTER associated with SSL_CONFIG block.  If the
+EXPORTER is an IPFIX EXPORTER, the I<observationDomainName> IE field will be
+populated with the exporter name.  This option is ignored if a MAP is also
+defined for this EXPORTER.
+
+=back
+
+=head2 DEDUP_CONFIG block
+
+The first command below is used at the top-level to begin a DEDUP_CONFIG
+block, and the remaining commands are accepted within the DEDUP_CONFIG
+context. The information from the DEDUP_CONFIG block is used by
+B<super_mediator> to determine which fields to perform de-deduplication
+on.  De-duplication can be used with any type of EXPORTER. This block can also
+ be used to configure incoming de-duplicated records from another
+B<super_mediator>. The pipe-delimited
+format for any TEXT file (except SSL) is as follows (line wrapped for readability):
+
+=over 2
+
+    first_seen | last_seen | sourceIP or dstIP | flow stime | \
+flowkeyhash | hitcount | value | map or exporter name
+
+=back
+
+where first_seen is the time of the first record, last_seen is the time
+of the last record seen with this tuple.  SourceIP or dstIP is the
+IP address for the flow which contained this value.
+ By default, B<super_mediator> stores values with the source IP address,
+but this behavior can be changed with the B<PREFIX> command.
+flow stime is the start time
+of the last flow to have this data present within the payload of the flow.
+flowkeyhash is the hash of the last flow's 5-tuple to have this data
+present within the payload of the flow. The flow stime and the flowkeyhash can
+provide a unique key for tracing the record back to flow data.
+The hitcount is the number of times the
+tuple was seen within first_seen and last_seen.  The value is the value of
+the information element. The map or exporter name is optional and will be
+present if B<ADD_EXPORTER_NAME> is present in the B<DEDUP_CONFIG> block
+or a B<PREFIX> line is configured with a MAP.
+
+For SSL, the format is slightly different (line wrapped for readability):
+
+=over 2
+
+    first_seen | last_seen | sourceIP or dstIP | flow stime | \
+flowkeyhash | hitcount | serial1 | issuer1 | serial2 | issuer2 | map or exporter name
+
+=back
+
+where serial1 is the serial number (in hex) of the first certificate in
+the SSL certificate chain.  issuer1 is the issuer's common name (id 3) of
+the first certificate in the SSL certificate chain.  serial2 is the serial
+number (in hex) of the second certificate in the SSL certificate chain and
+issuer2 is the the issuer's common name (id 3) of the second certificate
+in the chain.
+
+For IPFIX exporters, the following information elements will be exported:
+
+=over 2
+
+=item B<monitoringIntervalStartMilliSeconds> IE 359, 8 octets, unsigned
+
+The first time this data was seen (start time of the flow that contained
+this data).
+
+=item B<monitoringIntervalEndMilliSeconds> IE 360, 8 octets, unsigned
+
+The last time this data was seen (start time of the flow that contained
+this data).
+
+=item B<flowStartMilliseconds> IE 152, 8 octets, unsigned
+
+The start time of the last flow that contained the data being aggregated.
+The flowStartMilliseconds, with the flowKeyHash, can create a unique
+key that can be used to correlate with a SiLK flow or PCAP repository.
+
+=item B<observedDataTotalCount> CERT (PEN 6871) IE 929, 8 octets, unsigned
+
+The number of times this data was seen in the time period.
+
+=item B<sourceIPv6Address> IE 27, 16 octets, unsigned, I<FULL>
+
+IPv6 address of flow source or biflow initiator. Present for IPv6
+flows or IPv6-mapped IPv4 flows only.
+
+=item B<sourceIPv4Address> IE 8, 4 octets, unisigned, I<FULL>
+
+IPv4 address of flow source or biflow initiator. Present for IPv4
+flows without IPv6-mapped addresses only.
+
+=item B<flowKeyHash> CERT (PEN 6871) IE 106, 4 octets, unsigned
+
+The hash of the 5-tuple (sourceIPAddress, destinationIPAddress, sourcePort,
+Destinationport, protocol) and vlanId.
+
+=item B<observationDomainName> IE 300, variable length
+
+This field is populated if the DEDUP_CONFIG block was configured with B<ADD_EXPORTER_NAME>
+or the PREFIX line contained a B<VLAN_MAP> or B<OBID_MAP>.
+
+=item I<Information element depends on FIELD_LIST defined in DEDUP_CONFIG> block.
+
+This information element will depend on how B<super_mediator> is configured
+and which information elements are present in the FIELD_LIST provided to
+B<PREFIX>.
+
+=item B<sslCertSerialNumber> CERT (PEN 6871) IE 244, variable length B<SSL_ONLY>
+
+The serial number of the first X.509 Certificate in the chain (local).
+Only present for SSL de-duplicated data (FIELD_LIST = [244]).
+
+=item B<sslCertIssuerCommonName> CERT (PEN 6871) IE 196, variable length B<SSL_ONLY>
+
+The common name of the Issuer (Certificate Authority) in the X.509 Certificate (first certificate in the chain). Only present for SSL de-duplicated data.
+
+=item B<sslCertSerialNumber> CERT (PEN 6871) IE 244, variable length B<SSL_ONLY>
+
+The serial number of the second X.509 Certificate in the chain.
+Only present for SSL de-duplicated data.
+
+=item B<sslCertIssuerCommonName> CERT (PEN 6871) IE 196, variable length B<SSL_ONLY>
+
+The common name of the Issuer (Certificate Authority) in the X.509 Certificate.
+Only present for SSL de-duplicated data.
+
+=back
+
+=over 4
+
+=item B<DEDUP_CONFIG> I<EXPORTER_NAME>
+
+The DEDUP_CONFIG command begins a new DEDUP_CONFIG block and it continues
+to the DEDUP_CONFIG END command.  The only required argument to the
+DEDUP_CONFIG command is the I<EXPORTER_NAME> for which the
+deduplication configuration applies.  This should match the name
+of one and only one TEXT EXPORTER from the configuration file.
+The DEDUP_CONFIG block should be placed after the EXPORTER
+block for which it refers to.
+
+=item B<DEDUP_CONFIG END>
+
+The DEDUP_CONFIG END comand ends the definition of a DEDUP_CONFIG
+block.  Following a DEDUP_CONFIG END command, top-level commands
+are again accepted.
+
+=item B<PREFIX> I<FILE_PREFIX> B<SIP|DIP|FLOWKEYHASH> B<MAP(I<MAPNAME>)> FIELD_LIST
+
+At least one B<PREFIX> command must be present within a DEDUP_CONFIG
+block.  The B<PREFIX> command defines which information elements
+will be deduplicated and the filename prefix in which the records
+will be written to.  If the EXPORTER for which this DEDUP_CONFIG
+applies is a TEXT exporter, it should have specified a
+B<PATH> that is a file directory. I<FILE_PREFIX> will be the prefix
+of the filename that deduplicated
+records will be written to. The timestamp will be appended to the
+I<FILE_PREFIX>.  If the EXPORTER is a JSON EXPORTER or an IPFIX File
+EXPORTER, all deduplicated
+information will be written to the same file.  The B<PATH> keyword
+for the associated EXPORTER should be a valid file path with file prefix.
+For JSON exporters, the deduplication information will be identified
+by the key I<FILE_PREFIX>.
+Optionally, you can specify if the values should
+be cached with the source or destination IP address.  By default,
+B<super_mediator> uses the source IP address (SIP). You may decide to
+use the destination IP address for fields that are traditonally found
+in the reverse direction of the flow, such as "httpResponse" or
+"httpHost".  Or you can use FLOWKEYHASH to deduplicate flows that have
+the same 5-tuple and data field. The I<FIELD_LIST> is a
+list of information element IDs, separated by a comma, and
+surrounded by square brackets, [ and ].
+To use a VLAN_MAP or OBID_MAP in addition to the SIP, DIP, FLOWKEYHASH
+key use MAP(I<MAPNAME>).  The VLAN_MAP or OBID_MAP with I<MAPNAME>
+must be defined before the DEDUP_CONFIG block in the configuration file.
+If a MAP is used, then a TEXT record will include an extra column at the end
+of the line with the I<MAPNAME> and an IPFIX record will contain an additional
+information element I<observationDomainName> with the name of the MAP.
+A list of information element IDs can be found above in B<DPI_CONFIG>.
+The only valid DNS and SSL/TLS information element IDs are 179 and 244,
+respectively.  179 will enable de-duplication of DNS queries only.
+See the DNS_DEDUP block for more information on de-duplicating on DNS
+responses.  244 will de-duplicate SSL certificate chains used by a particular IP.
+To de-duplicate on all SSL certificates, see the SSL_DEDUP option in the
+SSL_CONFIG block.
+
+=over 2
+
+    DEDUP_CONFIG "exporter1"
+        PREFIX "useragent" [111]
+        PREFIX "host" DIP [120]
+        PREFIX "p0f" [36, 37, 107]
+        PREFIX "dns" [179]
+        PREFIX "ssl" [244]
+    DEDUP_CONFIG END
+
+=back
+
+=item B<MERGE_TRUNCATED>
+
+If present, B<super_mediator> will be less strict in deduplicating
+values by merging truncated values into complete cached records.  For
+example, the following records:
+
+=over 2
+
+    2016-01-28 21:52:59.940|2016-01-28 21:58:01.649|10.10.1.44|2016-01-28 21:53:00.035|978282914|1|Mozilla/5.0 (X11; U; CrOS i686
+    2016-01-28 21:52:59.940|2016-01-28 21:58:01.649|10.10.1.44|2016-01-28 21:53:00.035|978282914|1|Mozilla/5.0 (X11; U; CrOS i686 0.10.
+    2016-01-28 21:52:59.940|2016-01-28 21:58:01.649|10.10.1.44|2016-01-28 21:53:00.035|978282914|4|Mozilla/5.0 (X11; U; CrOS i686 0.10.146;
+    2016-01-28 21:52:59.940|2016-01-28 21:58:01.649|10.10.1.44|2016-01-28 21:53:00.035|978282914|18|Mozilla/5.0 (X11; U; CrOS i686 0.10.146; en-US)
+
+=back
+
+will be collapsed into one record:
+
+=over 2
+
+    1296251215151|1296252025761|10.10.1.6|24|Mozilla/5.0 (X11; U; CrOS i686 0.10.146; en-US)
+
+=back
+
+=item B<FLUSH_TIME> I<FLUSH_SECONDS>
+
+If present, the B<super_mediator> will flush a dedup record from the cache
+when a new record has not been seen for over I<FLUSH_SECONDS>.  B<super_mediator>
+will write the record when either the B<FLUSH_TIME> or B<MAX_HIT_COUNT>
+condition has been met. The default I<FLUSH_SECONDS> is 300 seconds, or 5 minutes.
+
+=item B<MAX_HIT_COUNT> I<COUNT>
+
+If present, B<super_mediator> will flush a dedup record from the cache
+when the internal hit count reaches I<COUNT>.  The record will be written
+at this time.  The default I<COUNT> is 5000.
+
+=item B<ADD_EXPORTER_NAME>
+
+If present, B<super_mediator> will add an extra column onto the TEXT record
+with the name of the EXPORTER associated with DEDUP_CONFIG block.  If the
+EXPORTER is an IPFIX EXPORTER, the I<observationDomainName> IE field will be
+populated with the exporter name.
+
+=back
+
+=head2 MAP Blocks
+
+The first command below is used at the top-level to begin a MAP
+block, and the remaining commands are accepted within the MAP
+context. The information from the MAP block is used by
+B<super_mediator> in conjunction with the DEDUP_CONFIG block to determine
+which fields to perform de-deduplication
+on and how to aggregate the data. The use of map blocks are optional.
+They are only used when there is a need to aggregate data on VLAN(s) or
+observation domain(s) in addition to IP address.  This block should
+precede any DEDUP_CONFIG block that intends to use the defined MAP.
+
+=over 2
+
+=item B<[VLAN|OBID]_MAP> I<MAPNAME>
+
+The VLAN_MAP or OBID_MAP command begins a new map definition block
+which continues to the VLAN_MAP END or OBID_MAP END command.  The
+argument to the VLAN_MAP or OBID_MAP command is the name of the
+MAP. If VLAN_MAP is used, any value defined in the VLAN_MAP block will
+be compared with the IPFIX information element I<vlanId>.  If
+OBID_MAP is used, any value defined in the OBID_MAP block will
+be compared with the observation domain field in the IPFIX header.
+
+=item B<[VLAN|OBID]_MAP END>
+
+The VLAN_MAP END or OBID_MAP END command ends the definition of
+a map.  Following this command, top-level commands are again accepted.
+
+=item B<I<GROUP_NAME>> I<[INTEGER VALUE LIST]> or B<OTHER>
+
+This command adds integer values to a MAP group, where each integer
+is treated as a VLAN ID or observation domain ID.  This command may
+appear multiple times in a MAP block.  Each integer value may be between
+0 and 65535.  If the B<OTHER> keyword is present instead of an INTEGER VALUE
+LIST, then the I<GROUP_NAME> will be used for any value not in one of the lists
+within the MAP block.
+
+=over 2
+
+    VLAN_MAP networks
+      "S1" [1,2,3]
+      "S2" [4,5,6]
+      "S3" [7,8,9]
+      "other" OTHER
+    VLAN_MAP END
+
+=back
+
+=item B<DISCARD_OTHER>
+
+If this command is present within a VLAN_MAP or OBID_MAP block, then any
+flow received that does not match one of the values in one of the lists,
+will be discarded.
+
+=over 2
+
+    OBID_MAP "mymap"
+       "S1" [1,2,3]
+       "S2" [4,5,6]
+       "S3" [7,8,9]
+       DISCARD_OTHER
+    OBID_MAP END
+
+=back
+
+=back
+
+=head1 EXAMPLES
+
+=head2 TCP Collector
+
+=over 2
+
+    COLLECTOR TCP
+        HOST "127.0.0.1"
+        PORT 18000
+    COLLECTOR END
+
+=back
+
+=head2 Spread Collector with name "SP0"
+
+=over 2
+
+    COLLECTOR SPREAD SP0
+        DAEMON "4803"
+        GROUP TEST2
+    COLLECTOR END
+
+=back
+
+=head2 Poll-Directory Collector with Port 53 Filter
+
+=over 2
+
+    COLLECTOR DIR
+        ANY_PORT == 53
+        PATH "/tmp/flow/yaf-*"
+        POLL 30
+        MOVE "/data/flow/done"
+        LOCK
+    COLLECTOR END
+
+=back
+
+=head2 Filter on Collection (applied to all Collectors)
+
+=over 2
+
+    FILTER
+        APPLICATION == 80
+        ANY_PORT == 80
+    FILTER END
+
+=back
+
+=head2 TCP Exporter (rwflowpack) with name "SiLK"
+
+=over 2
+
+    EXPORTER TCP SiLK
+        HOST "localhost"
+        PORT 18001
+        FLOW_ONLY
+    EXPORTER END
+
+=back
+
+=head2 TCP Exporter for flows that were collected by COLLECTOR "C1"
+
+=over 2
+
+    EXPORTER TCP
+        COLLECTOR == C1
+        HOST "localhost"
+        PORT 18001
+        FLOW_ONLY
+    EXPORTER END
+
+=back
+
+=head2 De-duplicated DNS to CSV files
+
+=over 2
+
+    EXPORTER TEXT
+        PATH "/data/dns/yaf2dns"
+        ROTATE 120
+        LOCK
+        DNS_DEDUP_ONLY
+        DELIMITER ","
+    EXPORTER END
+
+
+B<Example Data in "/data/dns/yaf2dns-20120504-0001.txt":>
+
+    2012-04-10 04:41:54.194,2,wikimedia.org.,ns2.wikimedia.org.
+
+=back
+
+=head2 Export to TEXT files with filter
+
+=over 2
+
+    EXPORTER TEXT
+        PATH "/data/http-only.txt"
+        APPLICATION == 80
+        DPI_ONLY
+    EXPORTER END
+
+B<Example Data in C</data/http-only.txt>:>
+
+    flow|1441601726|1207802496583|1.2.3.4|208.80.152.2|6|1360|80|0
+    http|115|1441929406|1207802496582|http://en.wikipedia.org/wiki/Http
+    http|114|1441601726|1207802496583|HTTP/1.0
+    http|117|1441601726|1207802496583|en.wikipedia.org
+
+=back
+
+=head2 Spread Exporter with filters for each group
+
+=over 2
+
+    EXPORTER SPREAD
+        DAEMON "4803"
+        GROUP TEST1
+        GROUP TEST2
+    EXPORTER END
+
+    GROUP TEST1
+        ANY_PORT == 53
+    GROUP END
+
+    GROUP TEST2
+        ANY_PORT == 80
+    GROUP END
+
+=back
+
+=head2 De-duplication options
+
+=over 2
+
+    DNS_DEDUP
+        FLUSH_TIME 600
+        BASE64_ENCODE
+    DNS_DEDUP END
+
+
+B<Example Using BASE_64 Encode:>
+
+    2010-07-21 11:51:15.166|6|bmVtby3kbGEubTlsLg==|bnMxLmTsYS5taWwu
+    2010-07-21 11:51:15.175|2|bm5zYy58kbGEuLWlsLg==|bnMnLmRsYS9taWwu
+
+=back
+
+=head2 DPI Configuration options - MULTI_FILE Example
+
+=over 2
+
+    EXPORTER TEXT
+        PATH "/data/dpi"
+        ROTATE 120
+        LOCK
+        DPI_ONLY
+        MULTI_FILES
+    EXPORTER END
+
+    DPI_CONFIG
+        TABLE myhttp [110, 111, 112]
+        TABLE mydns [1, 28]
+        TABLE myp0f [36, 37]
+        TABLE myssl [244,247,248,443]
+    DPI_CONFIG END
+
+B<Example Data for MULTI_FILE Config Example:>
+
+    In /data/dpi/flow.txt0:
+        1441601726|1207802496583|10.10.1.172|10.10.152.2|6|1360|80|0|0
+        114422227|1207802496560|10.10.1.172|10.10.1.10|17|1599|53|0|0
+        4144722023|1296251240788|10.10.0.204|10.10.4.3|6|54489|443|900|0
+    In /data/dpi/myp0f.txt0:
+        36|1441601726|1207802496583|0|Windows
+        37|1441601726|1207802496583|0|2000 SP2+, XP SP1+ (seldom 98)
+    In /data/dpi/myhttp.txt0:
+        112|1441601726|1207802496583|0|/skins-1.5/monobook/headbg.jpg
+        112|1441601726|1207802496583|0|/skins-1.5/common/images/poweredby_mediawiki_88x31.png
+    In /data/dpi/mydns.txt0:
+        114422227|1207802496560|0|Q|14728|0|0|0|1|0|meta.wikimedia.org.
+        114422227|1207802496560|0|R|14728|1|0|0|1|120|rr.pmtpa.wikimedia.org.|10.10.15.2
+    In /data/dpi/myssl.txt0:
+        10|4144722023|1296251240788|0|S|0|Apple Inc
+
+=back
+
+=head2 DPI Configuration with alternative index name
+
+=over 2
+
+    EXPORTER TEXT DPIExporter
+        PATH "/data/dpi/dpi_data.txt"
+        DPI_ONLY
+    EXPORTER END
+
+    DPI_CONFIG flow_index
+        TABLE kitchen_sink [110,111,112,113,2,15,186,200,201]
+    DPI_CONFIG END
+
+B<Example Data with above configuration:>
+
+    flow_index|1441208511|1207802506600|128.237.224.172|208.80.152.3|6|1370|80|0|0
+    kitchen_sink|111|1441208511|1207802506600|0|Mozilla/4.0(compatible; MSIE 7.0; Windows NT 5.1;)
+    kitchen_sink|112|1441208511|1207802506600|0|/wikipedia/commons/thumb/d/de/Www.wikipedia.org_screenshot.png/300px-Www.wikipedia.org_screenshot.png
+
+=back
+
+=head2 IPset filter in Exporter
+
+=over 2
+
+    EXPORTER TEXT
+        ANY_IP IN_LIST "mywatchlist.set"
+        PATH "/data/dpi/dpi_data.txt"
+        DPI_ONLY
+    EXPORTER END
+
+=back
+
+=head2 Custom Field List Example
+
+=over 2
+
+    EXPORTER TEXT
+        PATH "/data/flow/custom.txt"
+        FIELDS stime,etime,sip,dip,sport,dport,protocol,vlan,pkts,bytes,dpi
+        DPI_FIELD_LIST [111,112,110,1,2,5,6,12,244,248,247,443]
+    EXPORTER END
+
+=back
+
+=head2 Custom SSL Field Example
+
+=over 2
+
+    EXPORTER TEXT sslcerts
+       PATH "/data/flow/sslcerts.txt"
+       FIELDS stime, sip, dip, sport, dport, dpi
+    EXPORTER END
+
+    SSL_CONFIG sslcerts
+       ISSUER [*]
+       SUBJECT [7, 8]
+       OTHER  [247, 248]
+       EXTENSIONS [14, 15]
+    SSL_CONFIG END
+
+B<Example Data with above configuration:>
+
+    2015-04-08 19:14:32.251|1.2.3.4|3.4.5.6|49878|443|8|S|0|Washington
+    2015-04-08 19:14:32.251|1.2.3.4|3.4.5.6|49878|443|7|S|0|Seattle
+    2015-04-08 19:14:32.251|1.2.3.4|3.4.5.6|49878|443|247|I|0|140601000000Z
+    2015-04-08 19:14:32.251|1.2.3.4|3.4.5.6|49878|443|248|I|0|150521235959Z
+    2015-04-08 19:14:32.251|1.2.3.4|3.4.5.6|49878|443|6|I|1|US
+    2015-04-08 19:14:32.251|1.2.3.4|3.4.5.6|49878|443|11|I|1|VeriSign Trust Network
+
+=back
+
+=head2 SSL Certificate De-duplication Example
+
+=over 2
+
+    EXPORTER TEXT ssldedup
+        PATH "/data/ssl/ssldedup"
+        SSL_DEDUP_ONLY
+        ROTATE 600
+        LOCK
+    EXPORTER END
+
+    SSL_CONFIG ssldedup
+        ISSUER [*]
+        SUBJECT [*]
+        OTHER [*]
+        EXTENSIONS [*]
+        CERT_FILE "/data/ssl/certs"
+        FLUSH_TIME 1200
+        MAX_HIT_COUNT 10000
+    SSL_CONFIG END
+
+B<Example Data with above configuration:>
+
+      $ head -n 5 /data/ssl/certs.txt
+      0x5294e23f0bfa5bb98c0|VeriSign Class 3 International Server CA - G3|\
+      2015-04-08 19:14:14.618|6|I|0|US
+      0x5294e23f0bfa5bb98c0|VeriSign Class 3 International Server CA - G3|\
+      2015-04-08 19:14:14.618|10|I|0|VeriSign, Inc.
+      0x5294e23f0bfa5bb98c0|VeriSign Class 3 International Server CA - G3|\
+      2015-04-08 19:14:14.618|11|I|0|VeriSign Trust Network
+      0x5294e23f0bfa5bb98c0|VeriSign Class 3 International Server CA - G3|\
+      2015-04-08 19:14:14.618|11|I|0|Terms of use at https://www.verisign.com/rpa (c)10
+      0x5294e23f0bfa5bb98c0|VeriSign Class 3 International Server CA - G3|\
+      2015-04-08 19:14:14.618|3|I|0|VeriSign Class 3 International Server CA - G3
+
+      $ head -n 5 /data/ssl/ssldedup.txt
+      2015-04-08 19:14:14.618|2015-04-08 19:14:30.117|0x5294e23f0bfa5bb98c0|2|VeriSign Class 3 International Server CA - G3
+      2015-04-08 19:14:39.902|2015-04-08 19:14:39.915|0x009ddde63d7dc9573067e|2|EssentialSSL CA
+      2015-04-08 19:14:39.902|2015-04-08 19:14:39.915|0x18b2cbbfc1f2f326462a4a|2|COMODO Certification Authority
+      2015-04-08 19:14:39.902|2015-04-08 19:14:39.915|0x2e79832eef31a6ee67a44|2|UTN - DATACorp SGC
+
+=back
+
+=head2 HTTP Deduplication Example
+
+=over 2
+
+    EXPORTER TEXT "httpdedup"
+        PATH "/data/dedup"
+        ROTATE 120
+        LOCK
+    EXPORTER END
+
+    DEDUP_CONFIG "httpdedup"
+        PREFIX "useragent" SIP [111]
+        PREFIX "referer" [115]
+        PREFIX "host" DIP [117]
+        MAX_HIT_COUNT 65535
+        FLUSH_TIME 600
+        MERGE_TRUNCATED
+    DEDUP_CONFIG END
+
+B<Example data with the above configuration:>
+
+    $ head -n 4 /data/useragent_20110128220025.txt
+    2015-04-08 19:15:24.645|2015-04-08 19:15:24.645|10.10.1.60|2015-04-08 19:15:24.645|2221618956|2|Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.0.8)
+    2015-04-08 19:15:28.809|2015-04-08 19:15:28.809|10.10.0.205|2015-04-08 19:15:24.645|546421315|1|TwitterAndroid/1.0.5 (109) Nexus One/8 (HTC;passion)
+    2015-04-08 19:15:11.544|2015-04-08 19:16:18.351|10.13.0.63|2015-04-08 19:15:24.645|213547784|2|urlgrabber/3.9.1 yum/3.2.28
+    2015-04-08 19:16:21.632|2015-04-08 19:16:21.668|10.10.1.5|2015-04-08 19:15:24.645|1315645613|4|OpenTable/3.2 CFNetwork/485.12.7 Darwin/10.4.0
+
+    $ head -n 4 /data/referer_20110128220025.txt
+    2015-04-08 19:15:24.645|2015-04-08 19:15:24.645|10.27.33.66|2015-04-08 19:15:24.645|532889529|10|http://www.google.com/search?hl=en&biw=1274
+    2015-04-08 19:15:28.809|2015-04-08 19:15:28.809|10.10.1.45|2015-04-08 19:15:24.645|654654123|4|http://www.ustream.tv/socialstream/6951299
+    2015-04-08 19:15:11.544|2015-04-08 19:16:18.351|10.11.0.139|2015-04-08 19:15:24.645|212754153|2|http://reviews.opentable.com/0938/33364/reviews.htm
+    2015-04-08 19:16:21.632|2015-04-08 19:16:21.668|10.10.1.31|2015-04-08 19:15:24.645|3264312556|1|http://www.northerntool.com/shop/tools/product.htm
+
+    $ head -n 4 /data/host_20110128220025.txt
+    2015-04-08 19:15:24.645|2015-04-08 19:15:24.645|10.10.0.196|2015-04-08 19:15:24.645|3251463421|1|www.funtrivia.com
+    2015-04-08 19:15:28.809|2015-04-08 19:15:28.809|172.16.0.163|2015-04-08 19:15:24.645|134313131|1|twitter.com
+    2015-04-08 19:15:11.544|2015-04-08 19:16:18.351|10.10.0.247|2015-04-08 19:15:24.645|313546131319|16|reviews.opentable.com
+    2015-04-08 19:16:21.632|2015-04-08 19:16:21.668|10.10.1.45|2015-04-08 19:15:24.645|210564613203|7|a2.twimg.com
+
+=back
+
+=head2 Deduplication with a OBID_MAP
+
+=over 2
+
+    OBID_MAP "sensors"
+        S1 [1, 2, 3]
+        S2 [4, 5, 6]
+        S3 [7, 8, 9]
+        "S_OTHER" OTHER
+    OBID_MAP END
+
+    EXPORTER TEXT "dedup"
+        PATH "/data/dedup/"
+    EXPORTER END
+
+    DEDUP_CONFIG "dedup"
+        PREFIX "useragent" SIP MAP(sensors) [111]
+        MAX_HIT_COUNT 65535
+        FLUSH_TIME 600
+        MERGE_TRUNCATED
+    DEDUP_CONFIG END
+
+B<Example with the above configuration:>
+
+    $ head -n 4 /data/dedup/useragent.txt
+    2011-01-28 21:45:53.130|2011-01-28 21:49:33.630|10.10.1.13|2011-01-28 21:49:33.518|327929330|8|Mozilla/5.0 (iPad; U; CPU OS 3_2 like Mac OS X; en-us) AppleWebKit/531.21.10 (KHTML, like Gecko) Version/4.0.4 Mobile/7B367 Safari/531.21.10|S_OTHER
+    2011-01-28 21:48:45.775|2011-01-28 21:48:45.775|10.10.0.209|2011-01-28 21:48:43.713|2118954148|1|Google Update/1.2.183.39;winhttp|S2
+    2011-01-28 21:48:47.163|2011-01-28 21:48:47.163|10.10.0.209|2011-01-28 21:48:46.905|1985639067|1|Microsoft NCSI|S1
+
+=back
+
+=head2 IPFIX Exporter with multiple protocol deduplication
+
+=over 2
+
+    EXPORTER FILEHANDLER "multi-dedup"
+        PATH "/data/sm/super"
+        ROTATE 120
+        GZIP_FILES
+        MOVE "/data/sm/done"
+        DNS_DEDUP
+        SSL_DEDUP
+        NO_FLOW
+     EXPORTER_END
+
+     DNS_DEDUP "multi-dedup"
+        MAX_HIT_COUNT 5000
+        FLUSH_TIME 600
+        LAST_SEEN
+     DNS_DEDUP END
+
+     DEDUP_CONFIG "multi-dedup"
+        PREFIX "httpua" [111]
+        PREFIX "httplang" [121]
+        PREFIX "httpserver" DIP [110]
+        PREFIX "httphost" DIP [117]
+        PREFIX "https" DIP [244]
+        MERGE_TRUNCATED
+        MAX_HIT_COUNT 10000
+        FLUSH_TIME 600
+     DEDUP_CONFIG END
+
+=back
+
+=head2 Logging options
+
+=over 2
+
+    LOG "/var/log/mediator.log"
+
+    LOGLEVEL DEBUG
+
+=back
+
+=head1 KNOWN ISSUES
+
+Bug reports and feature requests may be sent via email to
+E<lt>netsa-help@cert.orgE<gt>.
+
+B<yaf> presently encodes the ICMP type and code information into the
+destinationTransportPort information element for ICMP and ICMP6 flows.
+B<super_mediator> running in TEXT output mode writes the type in the
+sourceTransportPort field and the ICMP code in the destinationTransportPort
+field.
+
+=head1 SEE ALSO
+
+B<yaf(1)>, B<rwflowpack(8)>, B<flowcap(8)>, Spread documentation www.spread.org
+
+=head1 AUTHORS
+
+Emily Sarneso and the CERT Network Situational Awareness Group Engineering Team, E<lt>http://www.cert.org/netsaE<gt>.
+
+=cut
+
+
+
+
+

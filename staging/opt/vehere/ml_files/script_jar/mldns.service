@@ -1,0 +1,17 @@
+[Unit]
+Description=ML-DNS
+
+[Service]
+Restart=always
+RestartSec=300
+Type=simple
+User=logstash
+Group=logstash
+ExecStart=/usr/local/bin/ml-analyzer/dnsAnalysis.sh
+StandardOutput=file:/var/log/sparkLog/mldns.log
+StandardError=file:/var/log/sparkLog/mldnsError.log
+
+SyslogIdentifier=mldns
+[Install]
+WantedBy=multi-user.target
+#Alias=mldns.service

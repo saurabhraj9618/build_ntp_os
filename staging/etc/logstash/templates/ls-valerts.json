@@ -1,0 +1,112 @@
+{
+  "template": "logvehere-alerts-*",
+  "version": 1,
+  "settings": {
+    "number_of_shards": 3,
+    "number_of_replicas": 1,
+    "index.mapping.total_fields.limit": 10000,
+    "index.refresh_interval": "60s",
+    "analysis": {
+      "analyzer": {
+        "character_analyzer": {
+          "type": "custom",
+          "tokenizer": "character_tokenizer"
+        },
+        "uri-email_analyzer": {
+          "type": "custom",
+          "tokenizer": "uri-email_tokenizer"
+        },
+        "lowercase_analyzer": {
+          "type": "custom",
+          "tokenizer": "lowercase_tokenizer"
+        }
+      },
+      "tokenizer": {
+        "character_tokenizer": {
+          "type": "nGram",
+          "min_gram": 1,
+          "max_gram": 1
+        },
+        "uri-email_tokenizer": {
+          "type": "uax_url_email"
+        },
+        "lowercase_tokenizer": {
+          "type": "lowercase"
+        }
+      }
+    }
+  },
+  "mappings": {
+    "_default_": {
+      "_all": {
+        "enabled": true,
+        "norms": false
+      },
+      "dynamic_templates": [
+        {
+          "message_field": {
+            "path_match": "message",
+            "match_mapping_type": "string",
+            "mapping": {
+              "type": "text",
+              "norms": false
+            }
+          }
+        },
+        {
+          "string_fields": {
+            "match": "*",
+            "match_mapping_type": "string",
+            "mapping": {
+              "type": "text",
+              "norms": false,
+              "fields": {
+                "keyword": {
+                  "type": "keyword",
+                  "index": "not_analyzed",
+                  "ignore_above": 256
+                },
+                "length": {
+                  "type": "token_count",
+                  "analyzer": "character_analyzer"
+                },
+                "count": {
+                  "type": "token_count",
+                  "analyzer": "standard"
+                },
+                "uri-email": {
+                  "type": "text",
+                  "analyzer": "uri-email_analyzer"
+                },
+                "lower": {
+                  "type": "text",
+                  "analyzer": "lowercase_analyzer"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "@timestamp": {
+          "type": "date",
+          "include_in_all": false
+        },
+        "@version": {
+          "type": "keyword",
+          "include_in_all": false
+        },
+        "network": {
+          "properties": {
+            "src_ip": {
+              "type": "ip"
+            },
+            "dst_ip": {
+              "type": "ip"
+            }
+          }
+        }
+      }
+    }
+  }
+}

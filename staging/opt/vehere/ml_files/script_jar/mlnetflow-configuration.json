@@ -1,0 +1,11 @@
+{
+      "initialize":0,
+      "firstBaseliningInterval":120,
+      "fullBaseliningInterval":1440,
+      "steppingIntervals":15,
+      "no_of_steppingIntervals":8,
+      "boostSwing":15,
+      "boostMultiplier":10,
+      "boostPausePeriod":2880,
+      "getNotificationInPercentage":10
+}

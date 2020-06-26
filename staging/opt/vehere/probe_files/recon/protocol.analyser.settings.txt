@@ -1,0 +1,22 @@
+tsharkPath=/usr/bin/tshark
+pcapExporterPath=/usr/local/bin/probe/vnfs_export_pcap
+reconRequestFolderPath=/var/raw/recon/
+
+#requestServerAttributes=vehere@192.168.2.100:22:/home/vehere/recon/:0_,1_,2_,3_:vehere@123
+
+#requestServerAttributes=uid@ip:port:json path:probe_id_list:passowrd
+
+minimumFreeRawSpaceInGB=256
+rawFolderPath=/var/lib/raw/
+
+rawPartitionDevName=/dev/sdc2
+jsonDBLoaderInputFolderPath=/var/lib/meta
+jsonDBLoaderOutputErrorFolderPath=/var/lib/error_meta
+jsonDBLoaderElasticsearchULR=http://127.0.0.1:9200/_bulk?pretty
+monitoringInterfaceListFileName=/usr/local/etc/iface.monitoring.lst
+
+minimumFreeDBSpaceInGB=100
+dbDataPartitionDevName=/dev/sdc1
+dbIndexFlusherElasticsearchULR=127.0.0.1:9200/DBNAME
+dbIndexFetcherElasticsearchULR=127.0.0.1:9200/_cat/indices?v
+dbSessionExportElasticsearchULR=127.0.0.1:9200/vnfsdb-DBNAME/l4/SESSIONID?pretty=true

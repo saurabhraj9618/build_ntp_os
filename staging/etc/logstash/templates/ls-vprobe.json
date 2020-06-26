@@ -1,0 +1,207 @@
+{
+  "template": "logvehere-probe-*",
+  "version": 1,
+  "settings": {
+    "number_of_shards": 3,
+    "number_of_replicas": 1,
+    "index.mapping.total_fields.limit": 10000,
+    "index.refresh_interval": "60s",
+    "analysis": {
+      "analyzer": {
+        "character_analyzer": {
+          "type": "custom",
+          "tokenizer": "character_tokenizer"
+        },
+        "uri-email_analyzer": {
+          "type": "custom",
+          "tokenizer": "uri-email_tokenizer"
+        },
+        "lowercase_analyzer": {
+          "type": "custom",
+          "tokenizer": "lowercase_tokenizer"
+        }
+      },
+      "tokenizer": {
+        "character_tokenizer": {
+          "type": "nGram",
+          "min_gram": 1,
+          "max_gram": 1
+        },
+        "uri-email_tokenizer": {
+          "type": "uax_url_email"
+        },
+        "lowercase_tokenizer": {
+          "type": "lowercase"
+        }
+      }
+    }
+  },
+  "mappings": {
+    "_default_": {
+      "_all": {
+        "enabled": true,
+        "norms": false
+      },
+      "dynamic_templates": [
+        {
+          "message_field": {
+            "path_match": "message",
+            "match_mapping_type": "string",
+            "mapping": {
+              "type": "text",
+              "norms": false
+            }
+          }
+        },
+        {
+          "string_fields": {
+            "match": "*",
+            "match_mapping_type": "string",
+            "mapping": {
+              "type": "text",
+              "norms": false,
+              "fields": {
+                "keyword": {
+                  "type": "keyword",
+                  "index": "not_analyzed",
+                  "ignore_above": 256
+                },
+                "length": {
+                  "type": "token_count",
+                  "analyzer": "character_analyzer"
+                },
+                "count": {
+                  "type": "token_count",
+                  "analyzer": "standard"
+                },
+                "uri-email": {
+                  "type": "text",
+                  "analyzer": "uri-email_analyzer"
+                },
+                "lower": {
+                  "type": "text",
+                  "analyzer": "lowercase_analyzer"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "@timestamp": {
+          "type": "date",
+          "include_in_all": false
+        },
+        "@version": {
+          "type": "keyword",
+          "include_in_all": false
+        },
+        "session": {
+          "properties": {
+            "received_bytes": {
+              "type": "long"
+            },
+            "received_packets": {
+              "type": "long"
+            },
+            "max_mtu": {
+              "type": "long"
+            },
+            "end_time": {
+              "type": "date"
+            },
+            "min_mtu": {
+              "type": "long"
+            },
+            "duration": {
+              "type": "long"
+            },
+            "raw_array_index": {
+              "type": "long"
+            },
+            "start_time": {
+              "type": "date"
+            },
+            "transmitted_packets": {
+              "type": "long"
+            },
+            "total_bytes": {
+              "type": "long"
+            },
+            "raw_buffer_index": {
+              "type": "long"
+            },
+            "transmitted_bytes": {
+              "type": "long"
+            },
+            "total_packets": {
+              "type": "long"
+            }
+          }
+        },
+        "network": {
+          "properties": {
+            "src_asn_number": {
+              "type": "long"
+            },
+            "dst_geo_ip": {
+              "dynamic": true,
+              "properties": {
+                "ip": {
+                  "type": "ip"
+                },
+                "location": {
+                  "type": "geo_point"
+                },
+                "latitude": {
+                  "type": "half_float"
+                },
+                "longitude": {
+                  "type": "half_float"
+                }
+              }
+            },
+            "src_geo_ip": {
+              "dynamic": true,
+              "properties": {
+                "ip": {
+                  "type": "ip"
+                },
+                "location": {
+                  "type": "geo_point"
+                },
+                "latitude": {
+                  "type": "half_float"
+                },
+                "longitude": {
+                  "type": "half_float"
+                }
+              }
+            },
+            "src_location": {
+              "type": "geo_point"
+            },
+            "dst_asn_number": {
+              "type": "long"
+            },
+            "dst_location": {
+              "type": "geo_point"
+            },
+            "ip_version": {
+              "type": "long"
+            },
+            "ip_addresses": {
+              "type": "ip"
+            },
+            "src_ip": {
+              "type": "ip"
+            },
+            "dst_ip": {
+              "type": "ip"
+            }
+          }
+        }
+      }
+    }
+  }
+}

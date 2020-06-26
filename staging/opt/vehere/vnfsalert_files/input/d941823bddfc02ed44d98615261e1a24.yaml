@@ -1,0 +1,30 @@
+_id: d941823bddfc02ed44d98615261e1a24
+name: '10016: Many conversations between IP address and multiple Ports'
+index: 'logvehere-probe-*'
+type: metric_aggregation
+filter: []
+alert_transport: []
+import: /usr/local/etc/rulealerts.cfg
+is_enabled: true
+shared: false
+owner: vnfsadmin
+priority: 2
+timestamp_field: '@timestamp'
+description: Many conversations between IP address and multiple Ports
+sync_bucket_interval: false
+allow_buffer_time_overlap: false
+use_run_every_query_size: false
+query_key: network.dst_ip
+doc_type: 'VPROBE'
+max_threshold: 30
+metric_agg_key: transport.dst_port
+metric_agg_type: cardinality
+buffer_time:
+  minutes: 1
+ls_output_file_path: /var/log/ruleengine/vnfsalert.json
+
+alert:
+  - lsalert
+# Uncomment below lines and Put the command and the arguments as each array elements. 'command: ["/bin/send_alert", "--option", "%(filed.subfield)"]'
+#  - command
+#command: ["/bin/send_alert", "--username", "%(username)"]

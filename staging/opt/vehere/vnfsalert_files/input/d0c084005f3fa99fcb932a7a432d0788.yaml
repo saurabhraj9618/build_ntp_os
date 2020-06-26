@@ -1,0 +1,27 @@
+_id: d0c084005f3fa99fcb932a7a432d0788
+name: '10014: Emerging Threat Rule'
+index: 'logvehere-probe-*'
+type: any
+filter:
+  - bool:
+      must:
+        - term:
+            session.protocol.keyword: udp
+        - term:
+            transport.dst_port: 50000
+alert_transport: []
+import: /usr/local/etc/rulealerts.cfg
+is_enabled: false
+shared: false
+owner: vnfsadmin
+priority: 2
+timestamp_field: '@timestamp'
+description: ET EXPLOIT Win32/Industroyer DDOS Siemens SIPROTEC (CVE-2015-5374)
+ls_output_file_path: /var/log/ruleengine/vnfsalert.json
+owned: true
+
+alert:
+  - lsalert
+# Uncomment below lines and Put the command and the arguments as each array elements. 'command: ["/bin/send_alert", "--option", "%(filed.subfield)"]'
+#  - command
+#command: ["/bin/send_alert", "--username", "%(username)"]

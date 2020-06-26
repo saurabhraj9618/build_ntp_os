@@ -1,0 +1,14 @@
+[Unit]
+Description=Intelliworker Flow Capture
+After=network.target syslog.target
+
+[Service]
+Type=simple
+RemainAfterExit=yes
+#Restart=on-watchdog
+#RestartSec=180s
+ExecStart=/usr/local/bin/intelliworker.sh
+ExecStop=/usr/local/bin/stopall.sh
+[Install]
+WantedBy=multi-user.target
+#Alias=intelliworker.service

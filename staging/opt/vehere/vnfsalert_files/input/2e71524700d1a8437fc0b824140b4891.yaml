@@ -1,0 +1,28 @@
+_id: 2e71524700d1a8437fc0b824140b4891
+name: '10003: SipCLI VoIP Scan'
+index: 'logvehere-probe-*'
+type: any
+filter:
+  - term:
+      session.application.keyword: sip
+  - match_phrase:
+      payload.user_agent: sipcli/
+alert_transport: []
+import: /usr/local/etc/rulealerts.cfg
+enabled: true
+shared: false
+owner: vnfsadmin
+priority: 4
+timestamp_field: '@timestamp'
+description: |-
+  Signature code - 190429DELM02.2601061122
+  Detects a scan to a VoIP concentrator using SipCLI.
+ls_output_file_path: /var/log/ruleengine/vnfsalert.json
+owned: true
+is_enabled: true
+
+alert:
+  - lsalert
+# Uncomment below lines and Put the command and the arguments as each array elements. 'command: ["/bin/send_alert", "--option", "%(filed.subfield)"]'
+#  - command
+#command: ["/bin/send_alert", "--username", "%(username)"]

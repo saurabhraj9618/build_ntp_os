@@ -1,0 +1,202 @@
+{
+    "var_vnfs_enable_file_extraction": 1,
+    "var_vnfs_monitoring_interval": "10",
+    "var_vnfs_private_ip_address": "125.63.67.202",
+    "var_vnfs_metadata_rotation_days": "30",
+    "var_vnfs_collector_name": "SP0",
+    "ml": {
+        "var_vnfs_ml_netflow_out_path": "/var/log/vehere/ml-alert",
+        "var_vnfs_ml_dns_out_path": "/var/log/vehere/ml-dnsalert",
+        "var_vnfs_ml_netflow_threshold": "0.016",
+        "var_vnfs_ml_dns_threshold": "0.0012",
+        "var_vnfs_ml_netflow_alert_notification_limit": "10",
+        "var_vnfs_ml_dns_alert_notification_limit": "10",
+        "var_vnfs_ml_netflow_service_enable": "1",
+        "var_vnfs_ml_dns_service_enable": "1"
+    },
+
+    "var_vnfs_stat_data_path": "/var/log/vehere/stats",
+    "var_vnfs_dpi_data_path": "/var/log/vehere/dpi",
+    "var_vnfs_dpi_temp_path": "/var/log/flowtmp",
+    "var_vnfs_file_extraction_result_path": "/var/fx",
+    "probe": {
+        "var_vnfs_mass_monitoring_protocols": [
+            "http",
+            "smtp",
+            "pop3",
+            "imap",
+            "sip"
+        ],
+        "var_vnfs_daywise_index": 1,
+        "var_vnfs_dpi_enabled": 0,
+        "var_vnfs_pcap_import_path_max_size": "1073741824",
+        "var_vnfs_import_pcap_probe_id": 4,
+	"var_vnfs_pcap_import_path":"/var/log/importpcap/",
+	"var_vnfs_raw_buffer_height":"60",
+	"var_vnfs_meta_buffer_height":"128",
+	"var_vnfs_max_raw_file_size_in_mb":"128",
+	"var_vnfs_max_meta_file_size_in_mb":"10",
+	"var_vnfs_meta_storage_path":"/var/log/vehere/dpi",
+	"var_vnfs_raw_storage_path":"/var/log/vehere/raw",
+        "var_vnfs_reconstruction_request_path": "/var/log/vehere/raw/recon",
+        "var_vnfs_recon_for_text_search_req_path": "",
+        "var_vnfs_enable_sw_filter": "0",
+        "var_vnfs_raw_store_in_hours": "4320",
+        "var_vnfs_raw_storage_enabled": 1,
+        "var_vnfs_initial_payload_in_bytes": "256",
+        "var_vnfs_session_hash_length_multiplier": "1",
+        "var_vnfs_probe_ip": "192.168.2.215",
+        "var_vnfs_session_idle_timeout": "30",
+        "var_vnfs_session_active_timeout": "30",
+        "var_vnfs_enable_logstash_mode": "1",
+        "var_vnfs_ip_to_asn_file": "/usr/local/etc/dictionaries/asn.csv",
+        "var_vnfs_user_agent_to_machine_file": "/usr/local/etc/dictionaries/browscap.json",
+        "var_vnfs_ip_header_protocols_file": "/usr/local/etc/dictionaries/ip_header_protocols.yml",
+        "var_vnfs_tcp_header_protocols_file": "/usr/local/etc/dictionaries/tcp_protocols.yml",
+        "var_vnfs_udp_header_protocols_file": "/usr/local/etc/dictionaries/udp_protocols.yml",
+        "var_vnfs_sctp_header_protocols_file": "/usr/local/etc/dictionaries/sctp_service_protocols.yml",
+        "var_vnfs_dhcp_fingerprints_file": "/usr/local/etc/dictionaries/dhcp_fingerprints.txt",
+        "var_vnfs_ip_to_location_file": "/usr/local/etc/dictionaries/ip_loc_ng.csv",
+        "var_vnfs_mac_to_manifacture_file": "/usr/local/etc/dictionaries/mac_manu.ds",
+        "var_vnfs_tcp_syn_os_fingerprints_file": "/usr/local/etc/dictionaries/p0f.fp",
+        "var_vnfs_tcp_syn_ack_os_fingerprints_file": "/usr/local/etc/dictionaries/p0fa.fp",
+        "var_vnfs_sni_list_file": "/usr/local/etc/dictionaries/sni.lst",
+        "var_vnfs_gmt_list_file": "/usr/local/etc/dictionaries/gmt_input.lst",
+        "var_vnfs_imsi_db_file": "/usr/local/etc/dictionaries/imsi_list.txt",
+        "var_vnfs_imei_db_file": "/usr/local/etc/dictionaries/tacdb",
+	"var_vnfs_ndpi_proto_file": "/usr/local/etc/dictionaries/protos.txt",
+        "var_vnfs_is_balancer_enabled": 0,
+        "var_vnfs_index_name_ipdr": "logvehere-probe",
+        "var_vnfs_index_name_target": "logvehere-probe",
+        "probes": [
+            {
+                "var_vnfs_probe_id": "0",
+                "var_vnfs_capture_interfaces": [
+                    "pc:eno1"
+                ],
+                "var_vnfs_cluster_bind_core": "2",
+                "var_vnfs_writer_meta_bind_core": "3",
+                "var_vnfs_writer_raw_bind_core": "4",
+                "var_vnfs_session_flusher_bind_cores": [
+                    5
+                ],
+                "var_vnfs_processer_bind_cores": [
+                    6,
+                    7,
+                    8,
+                    9
+                ],
+                "var_vnfs_enabled": 1
+            },
+            {
+                "var_vnfs_probe_id": "4",
+                "var_vnfs_capture_interfaces": [
+                    "zc:128@0"
+                ],
+                "var_vnfs_cluster_bind_core": "2",
+                "var_vnfs_writer_meta_bind_core": "3",
+                "var_vnfs_writer_raw_bind_core": "4",
+                "var_vnfs_session_flusher_bind_cores": [
+                    5
+                ],
+                "var_vnfs_processer_bind_cores": [
+                    6,
+                    7,
+                    8,
+                    9,
+                    10,
+                    11
+                ],
+                "var_vnfs_enabled": 1
+            },
+            {
+                "var_vnfs_probe_id": "5",
+                "var_vnfs_capture_interfaces": [
+                    "zc:128@1"
+                ],
+                "var_vnfs_cluster_bind_core": "12",
+                "var_vnfs_writer_meta_bind_core": "13",
+                "var_vnfs_writer_raw_bind_core": "14",
+                "var_vnfs_session_flusher_bind_cores": [
+                    15
+                ],
+                "var_vnfs_processer_bind_cores": [
+                    16,
+                    17,
+                    18,
+                    19,
+                    20,
+                    21
+                ],
+                "var_vnfs_enabled": 1
+            },
+            {
+                "var_vnfs_probe_id": "6",
+                "var_vnfs_capture_interfaces": [
+                    "zc:128@2"
+                ],
+                "var_vnfs_cluster_bind_core": "22",
+                "var_vnfs_writer_meta_bind_core": "23",
+                "var_vnfs_writer_raw_bind_core": "24",
+                "var_vnfs_session_flusher_bind_cores": [
+                    25
+                ],
+                "var_vnfs_processer_bind_cores": [
+                    26,
+                    27,
+                    28,
+                    29,
+                    30,
+                    31
+                ],
+                "var_vnfs_enabled": 1
+            },
+            {
+                "var_vnfs_probe_id": "7",
+                "var_vnfs_capture_interfaces": [
+                    "zc:128@3"
+                ],
+                "var_vnfs_cluster_bind_core": "32",
+                "var_vnfs_writer_meta_bind_core": "33",
+                "var_vnfs_writer_raw_bind_core": "34",
+                "var_vnfs_session_flusher_bind_cores": [
+                    35
+                ],
+                "var_vnfs_processer_bind_cores": [
+                    36,
+                    37,
+                    38,
+                    39,
+                    40,
+                    41
+                ],
+                "var_vnfs_enabled": 1
+            }
+        ]
+    },
+    "alerts": {
+		"var_vnfs_rule_input_path":"/usr/local/etc/ruleengine/input",
+		"var_vnfs_rule_output_path":"/var/log/ruleengine",
+		"var_vnfs_syslog_host_to":"localhost",
+		"var_vnfs_syslog_protocol":"udp",
+		"var_vnfs_syslog_facility":"locl0",
+		"var_vnfs_syslog_host_from":"VEHERE",
+		"var_vnfs_syslog_port_number":"514",
+		"var_vnfs_alert_mail_to":"info@vehere.com",
+		"var_vnfs_alert_mail_from":"user@localhost",
+		"var_vnfs_alert_mail_server_host":"smtp.gmail.com",
+		"var_vnfs_alert_mail_userid":"user@domain.com",
+		"var_vnfs_alert_mail_password":"********",
+		"var_vnfs_alert_mail_secure":true,
+		"var_vnfs_alert_mail_server_port":"587",
+        	"var_vnfs_alert_suppression_time": "1d"
+    },
+
+    "var_vnfs_kafka_consumer_port_number": "",
+    "var_vnfs_kafka_producer_port_number": "",
+    "var_vnfs_kafka_event_topic": "event_topic",
+    "var_vnfs_kafka_email_alert_topic": "email_alert_topic",
+    "var_vnfs_kafka_uds_name": "",
+    "var_vnfs_kafka_host_ip": "localhost",
+    "var_vnfs_dpi_filter_index": "vnfsdpi"
+}

@@ -1,0 +1,20 @@
+metricbeat.modules:
+- module: system
+  metricsets:
+    - cpu
+    - load
+    - core
+    - diskio
+    - filesystem
+    - fsstat
+    - memory
+    - network
+    - process
+  enabled: true
+  period: ${PERIOD}
+  processes: ['^node$','^java$','^vnfs_balance$','^vnfs_probe$']
+
+output.logstash:
+  hosts: 127.0.0.1:5044
+  max_bulk_size: 2048
+

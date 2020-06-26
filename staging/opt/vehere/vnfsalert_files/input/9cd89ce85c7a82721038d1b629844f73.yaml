@@ -1,0 +1,29 @@
+_id: 9cd89ce85c7a82721038d1b629844f73
+name: '10006: Tor Access - Exit Nodes and Routers (v2)'
+index: 'logvehere-probe-*'
+type: blacklist
+filter: []
+alert_transport: []
+import: /usr/local/etc/rulealerts.cfg
+is_enabled: true
+shared: false
+owner: vnfsadmin
+priority: 6
+enabled: true
+timestamp_field: '@timestamp'
+compare_key: network.dst_ip
+blacklist:
+  - '!file /usr/local/etc/ruleengine/torexitnodes.txt'
+  - '!file /usr/local/etc/ruleengine/torrouternodes.txt'
+description: |-
+  Signature code - 190430DELM06.2601061122
+
+  Objective - Detects access to TOR exit nodes and, TOR routers.
+ls_output_file_path: /var/log/ruleengine/vnfsalert.json
+owned: true
+
+alert:
+  - lsalert
+# Uncomment below lines and Put the command and the arguments as each array elements. 'command: ["/bin/send_alert", "--option", "%(filed.subfield)"]'
+#  - command
+#command: ["/bin/send_alert", "--username", "%(username)"]

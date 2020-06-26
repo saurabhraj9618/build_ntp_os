@@ -1,0 +1,16 @@
+[Unit]
+Description=Intelliworker PacketMediator Module
+#Requires=intelliworker.service
+After=intelliworker.service
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=30
+EnvironmentFile=/usr/local/etc/packetm_args.conf
+ExecStart=/usr/local/bin/packetmediator $ARG1 $ARG2 $ARG3 $ARG4
+#ExecStop=/usr/local/bin/super_mediator_stop.sh
+
+[Install]
+WantedBy=multi-user.target
+#Alias=super_mediator.service

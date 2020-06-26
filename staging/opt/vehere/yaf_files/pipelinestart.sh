@@ -1,0 +1,2 @@
+#!/bin/bash
+/usr/local/sbin/pipeline --configuration-file /usr/local/etc/pipeline.conf --data-source-configuration-file /usr/local/etc/pipeline-datasources.conf --alert-log-file /var/log/pipeline.alert --aux-alert-file /var/log/pipelineaux.alert --log-pathname /var/log/pipeline.log --break-on-recs 10 --time-field-name flowEndMilliseconds --dns-public-suffix-file /usr/local/etc/public_suffix_list.dat --country-code-file /usr/local/etc/country_codes.pmap

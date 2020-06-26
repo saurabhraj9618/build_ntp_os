@@ -1,0 +1,39 @@
+Display Name
+original process name
+cmdline
+-------------------------------------------
+
+Vnfs-Ui
+node(kibana)
+/usr/share/kibana/bin/../node/bin/node --no-warnings /usr/share/kibana/bin/../src/cli -c /etc/kibana/kibana.yml
+
+
+Database-Engine
+java(elasticsearch)
+/usr/bin/java -Xms8g -Xmx8g -XX:+UseConcMarkSweepGC -XX:CMSInitiatingOccupancyFraction=75 -XX:+UseCMSInitiatingOccupancyOnly -XX:+AlwaysPreTouch -server -Xss1m -Djava.awt.headless=true -Dfile.encoding=UTF-8 -Djna.nosys=true -Djdk.io.permissionsUseCanonicalPath=true -Dio.netty.noUnsafe=true -Dio.netty.noKeySetOptimization=true -Dio.netty.recycler.maxCapacityPerThread=0 -Dlog4j.shutdownHookEnabled=false -Dlog4j2.disable.jmx=true -Dlog4j.skipJansi=true -XX:+HeapDumpOnOutOfMemoryError -Des.path.home=/usr/share/elasticsearch -cp /usr/share/elasticsearch/lib/* org.elasticsearch.bootstrap.Elasticsearch -p /var/run/elasticsearch/elasticsearch.pid --quiet -Edefault.path.logs=/var/log/elasticsearch -Edefault.path.data=/var/lib/elasticsearch -Edefault.path.conf=/etc/elasticsearch
+
+
+Message-Transport-Engine
+java(logstash)
+/usr/bin/java -XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:CMSInitiatingOccupancyFraction=75 -XX:+UseCMSInitiatingOccupancyOnly -XX:+DisableExplicitGC -Djava.awt.headless=true -Dfile.encoding=UTF-8 -XX:+HeapDumpOnOutOfMemoryError -Xmx8g -Xms8g -Xss2048k -Djffi.boot.library.path=/usr/share/logstash/vendor/jruby/lib/jni -Xbootclasspath/a:/usr/share/logstash/vendor/jruby/lib/jruby.jar -classpath : -Djruby.home=/usr/share/logstash/vendor/jruby -Djruby.lib=/usr/share/logstash/vendor/jruby/lib -Djruby.script=jruby -Djruby.shell=/bin/sh org.jruby.Main /usr/share/logstash/lib/bootstrap/environment.rb logstash/runner.rb --path.settings /etc/logstash
+
+
+Vnfs-Balance
+vnfs_balance
+--
+
+
+Suricata-Main
+Suricata-Main
+--
+
+
+ML-Dns-Analyzer
+java(dns)
+/usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java -cp /home/selks-user/spark-2.0.2-bin-hadoop2.7/conf/:/home/selks-user/spark-2.0.2-bin-hadoop2.7/jars/* -Xmx1g org.apache.spark.deploy.SparkSubmit --master local[6] --class org.apache.spot.SuspiciousConnects target/scala-2.10/spotmldns1704yaf.jar --analysis dns --input /home/selks-user/spark-2.0.2-bin-hadoop2.7/bin/DNS_DATA/dnsyaf.json --dupfactor 1000 --feedback /home/selks-user/spark-2.0.2-bin-hadoop2.7/bin/feedback.csv --ldatopiccount 20 --scored /var/log/vehere/ml-dnsalert --threshold 1 --maxresults -1 --esnode localhost --esport 9200
+
+
+ML-Netflow-Analyzer
+java(net)
+/usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java -cp /home/selks-user/spark-2.0.2-bin-hadoop2.7/conf/:/home/selks-user/spark-2.0.2-bin-hadoop2.7/jars/* -Xmx1g org.apache.spark.deploy.SparkSubmit --master local[6] --class org.apache.spot.SuspiciousConnects target/scala-2.10/spotmlnet1704yaf.jar --analysis flow --input /home/selks-user/spark-2.0.2-bin-hadoop2.7/bin/DNS_DATA/netflowyaf.json --dupfactor 1000 --feedback /home/selks-user/spark-2.0.2-bin-hadoop2.7/bin/feedback.csv --ldatopiccount 20 --scored /var/log/vehere/ml-alert --threshold 1 --maxresults -1 --esnode localhost --esport 9200
+

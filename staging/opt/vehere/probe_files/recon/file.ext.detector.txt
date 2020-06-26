@@ -1,0 +1,12 @@
+xhtml=html
+exe=exe.txt
+msi=msi.txt
+bat=bat.txt
+jar=jar.txt
+war=war.txt
+.xhtml=.html
+.exe=.exe.txt
+.msi=.msi.txt
+.bat=.bat.txt
+.jar=.jar.txt
+.war=.war.txt

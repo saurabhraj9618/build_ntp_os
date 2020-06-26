@@ -1,0 +1,1 @@
+java -Dfile.encoding=utf8 -jar Reconstructor.jar

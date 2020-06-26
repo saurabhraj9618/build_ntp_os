@@ -1,0 +1,29 @@
+_id: f0063d24f8986041809b82b290a1663b
+name: '10005: Bot, Command & Control and, Blacklisted IP Communication (v2)'
+index: 'logvehere-probe-*'
+type: blacklist
+filter: []
+alert_transport: []
+import: /usr/local/etc/rulealerts.cfg
+is_enabled: true
+shared: false
+owner: vnfsadmin
+priority: 4
+enabled: true
+timestamp_field: '@timestamp'
+description: |-
+  Signature code - 190430DELM05.2601061122
+
+  Objective - Detect Bot, Command & Control servers and, other general blacklisted IP Address communication. Not all Bot's are harmful. But, this list has them too. Use with caution.
+compare_key: network.dst_ip
+blacklist:
+  - '!file /usr/local/etc/ruleengine/blacklist1.txt'
+  - '!file /usr/local/etc/ruleengine/blacklist2.txt'
+ls_output_file_path: /var/log/ruleengine/vnfsalert.json
+owned: true
+
+alert:
+  - lsalert
+# Uncomment below lines and Put the command and the arguments as each array elements. 'command: ["/bin/send_alert", "--option", "%(filed.subfield)"]'
+#  - command
+#command: ["/bin/send_alert", "--username", "%(username)"]

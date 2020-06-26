@@ -1,0 +1,172 @@
+#!/bin/sh -e
+#
+### BEGIN INIT INFO
+# Provides:          kibana-dashboards-stamus
+# Required-Start:    $kibana $elasticsearch $nginx $time $network $local_fs $remote_fs
+# Required-Stop:     $remote_fs
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Loads Kibana templates in ES from cmd
+# Description:       Loads Kibana templates in ES from cmd
+#                    which is different from the way loading 
+#                    of templates works through the regular GUI
+### END INIT INFO
+
+## System boot time configuration script
+## Stamus Networks
+##
+## This program comes with ABSOLUTELY NO WARRANTY; for details see COPYING.
+## This is free software, and you are welcome to redistribute it
+## under certain conditions; see COPYING for details.
+
+KIBANA_LOADED="/etc/kibana/kibana-dashboards-loaded"
+ESRUNNING=false
+
+reset_dashboards() {
+    for I in $(seq 0 20); do
+            
+            #if ! echo exit | nc localhost 9200 
+            if  ( curl -f http://localhost:9200  &&  ${ESRUNNING}  )
+            then
+                
+                cd /opt/vnfsui-dashboard/ 2>/dev/null
+                ./load.sh
+                return 0
+ 
+                #sleep 30
+                #continue
+            elif ( curl -f http://localhost:9200  &&  ! ${ESRUNNING}  )
+            then
+
+                ESRUNNING=true
+                echo "Kibana dashboards reset: Elasticsearch not up yet or ready, retrying in 20 seconds."
+                sleep 40
+                continue
+
+            else
+                
+                echo "Kibana dashboards reset: Elasticsearch not up yet or ready, retrying in 10 seconds."
+                sleep 10
+                continue
+                
+            fi
+
+    done
+   return -1
+}
+
+reload_dashboards() {
+    for I in $(seq 0 20); do
+
+            if  ( curl -f http://localhost:9200  &&  ${ESRUNNING}  )
+            then
+                
+		cd /opt/vnfsui/vnfsui-dashboard/ 2>/dev/null
+                ./load.sh
+                return 0
+                
+                #sleep 30
+                #continue
+            elif ( curl -f http://localhost:9200  &&  ! ${ESRUNNING}  )
+            then 
+                
+                ESRUNNING=true
+                echo "Kibana dashboards reset: Elasticsearch not up yet or ready, retrying in 20 seconds."
+                sleep 20
+                continue
+   
+            else
+   
+                 echo "Kibana dashboards reset: Elasticsearch not up yet or ready, retrying in 10 seconds."
+                 sleep 10
+                 continue
+              
+            fi
+
+    done
+    return -1
+}
+
+reset_warning_msg() {
+	echo;
+	echo "WARNING: That will RESET all your Kibana 5 dashboards - "
+	echo "DELETE any custom dashboards/visualisatons (not the data) that you might have and (re)load the deafult ones !! "
+	echo;
+	echo "ERROR: The Kibana 5 dashboards will not be reset!! -> /etc/kibana/kibana-dashboards-loaded exists."
+	echo;
+	echo "If you would like to reset the dashboards - "
+	echo "please remove the file \"/etc/kibana/kibana-dashboards-loaded\""
+	echo "and then simply run: /etc/init.d/kibana-dashboards-stamus reset"
+	echo;
+	
+}
+
+reload_warning_msg() {
+	echo;
+	echo "WARNING: That will DELETE all your \"***SN ****\" Kibana 5 dashboards/visualisatons "
+	echo "and reload the newest default ones !! "
+	echo "Any other custom dashboards will not be affected."
+	echo;
+	echo "ERROR: The Kibana 5 dashboards will not be reloaded!! -> /etc/kibana/kibana-dashboards-loaded exists."
+	echo;
+	echo "If you would like to (re)load the newest dashboards - "
+	echo "please remove the file \"/etc/kibana/kibana-dashboards-loaded\""
+	echo "and then simply run: /etc/init.d/kibana-dashboards-stamus reload"
+	echo;
+
+}
+
+
+case "$1" in
+  start)
+    # same as reset
+    # needed for initial dashboard upload during 
+    # the first boot 
+    
+    if [ -e "$KIBANA_LOADED" ]; then
+	reset_warning_msg
+	exit 0
+    fi
+
+    if [ ! -e "$KIBANA_LOADED" ]; then
+	    reset_dashboards && touch $KIBANA_LOADED
+    fi
+    
+    chown -R kibana /usr/share/kibana/optimize/ 
+    /bin/systemctl restart  kibana.service
+
+  ;;
+  reset)
+    
+    if [ -e "$KIBANA_LOADED" ]; then
+	reset_warning_msg
+	exit 0
+    fi
+
+    if [ ! -e "$KIBANA_LOADED" ]; then
+	    reset_dashboards && touch $KIBANA_LOADED
+    fi
+    
+    chown -R kibana /usr/share/kibana/optimize/
+    /bin/systemctl restart  kibana.service
+
+  ;;
+  reload)
+    
+    if [ -e "$KIBANA_LOADED" ]; then
+	reload_warning_msg
+	exit 0
+    fi
+
+    if [ ! -e "$KIBANA_LOADED" ]; then
+	    reload_dashboards && touch $KIBANA_LOADED
+    fi
+    
+    chown -R kibana /usr/share/kibana/optimize/
+    /bin/systemctl restart  kibana.service
+
+  ;;
+  stop|start|status|restart|force-reload)
+    # do nothing
+  ;;
+esac

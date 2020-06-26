@@ -1,0 +1,324 @@
+Version 1.5.3 (2017-10-19)
+==========================
+
+Added template metadata (name and description) record output.
+
+Version 1.5.2 (2017-03-08)
+==========================
+
+Fix compile error introduced in version 1.5.1
+
+Version 1.5.1 (2017-03-06)
+==========================
+
+Add --become-user and --become-group command line options
+
+Bug Fix for compiling on Alpine Linux
+
+Version 1.5.0 (2017-01-05)
+==========================
+
+Add support for adding VLAN/Observation IDs to deduplication keys
+
+Changed format of DEDUP Exporters (added flow start time associated with flow key hash)
+
+Add ability to insert EXPORTER name in deduplication output records
+
+Add ability to read gzip'd IPFIX files
+
+Other Bug Fixes
+
+Version 1.4.0 (2016-10-04)
+===========================
+
+Add support for multiple protocol deduplication for IPFIX/JSON exporters
+
+Add post move file option for exporters 
+
+Add PAYLOAD, RPAYLOAD export options to custom field lists
+
+Empty files are now removed by default
+
+Bug Fix for uploading MULTI_FILES files to a MySQL database
+
+Other Bug Fixes
+
+Version 1.3.0 (2016-03-08)
+===========================
+
+Add file compression support for EXPORTERS
+
+Add Base64 Encode support for full certificate export
+
+Changed default file extension for JSON files to .json
+
+Bug Fix for ESCAPE_CHARS keyword for DNS_DEDUP Exporters
+
+Fix bug when command line arguments and config file are present
+
+Other Bug Fixes
+
+Version 1.2.2 (2016-01-07)
+==========================
+
+Bug Fixes for JSON exporters
+
+Version 1.2.1 (2015-12-29)
+==========================
+
+Add JSON output option to --output-mode switch
+
+Bug Fix for JSON exporters (DNS output)
+
+Version 1.2.0 (2015-12-22)
+===========================
+
+Remove support for fixbuf releases prior to libfixbuf-1.7.0
+
+Collect and export sslServerName
+
+Collect, decode, and export full X.509 Certificates
+
+MD5 hashing of X.509 Certificates with OpenSSL support
+
+SHA1 hashing of X.509 Certificates with OpenSSL support
+
+Collect and export list of DHCP options
+
+Bug Fixes
+
+Version 1.1.3 (2015-12-07)
+==========================
+
+Bug Fix for logging to syslog
+
+DNS Deduplication JSON export bug fix
+
+Update RPM spec file
+
+Version 1.1.2 (2015-10-28)
+==========================
+
+Bug Fix for TCP/UDP collector(s) that receive minimal data
+
+Version 1.1.1 (2015-07-01)
+============================
+
+Bug Fix for Custom Field List Text Exporters
+
+Bug Fix for configuring SSL De-duplication MAX_HIT_COUNT and FLUSH_TIME
+
+super_table_creator will now create de-duplication tables
+
+Documentation updates
+
+Version 1.1.0 (2015-06-26)
+==========================
+
+Requires libfixbuf 1.4.0 or greater
+
+SSL Certificate De-duplication
+
+Advanced SSL field export configuration
+
+Configurable De-duplication of any DPI Fields
+
+JSON file export
+
+Export of unnested DNS Resource Records
+
+New option to only export DNS Responses
+
+Add the ability to rotate and compress logs given a valid file directory
+
+New option to de-duplicate on only particular DNS resource record types
+
+MULTI_FILES CSV format change
+
+MySQL schema change for MULTI_FILES
+
+Bug Fix for Spread Collectors when daemon terminates
+
+Bug Fixes
+
+Version 1.0.2 (2014-10-15)
+==========================
+
+Bug Fix for Collectors
+
+Version 1.0.1 (2014-08-12)
+===========================
+
+Add support for escaping control characters and the delimiter character in DPI strings
+
+Bug Fix for DNP 3.0 text export
+
+Other Minor Bug Fixes.
+
+Version 1.0.0 (2014-06-13)
+===========================
+
+Add support for multiple collectors
+
+Add support for naming collectors and exporters
+
+Collector name included in default flow text export
+
+Add SSL Record Version
+
+Exporters can now filter on Collector name
+
+New log message format 
+
+Bug Fix for printing DPI Only in custom field lists
+
+Other Bug Fixes
+
+Version 0.4.0 (2014-03-04)
+==========================
+
+Added SCADA protocol and RTP DPI collection
+
+Added MySQL automatic reconnection capability
+
+Syslog logging capability
+
+Added ability to collect, print, and export MPLS labels
+
+Added ability to collect, print, and export Type of Service fields
+
+Incoming IPFIX records that use Delta counters will export the same fields
+
+Bug Fix for variable redeclaration on some operating systems
+
+Bug Fix for DNS deduplication timeout
+
+Other Bug Fixes
+
+Version 0.3.0 (2013-05-03)
+==========================
+
+Added the ability to define new information elements for collection
+
+New filter fields: INGRESS and EGRESS
+
+Added the ability to "AND" filters
+
+Added New YAF 2.4.0 information elements
+
+Bug Fixes
+
+Version 0.2.2 (2013-02-26)
+==========================
+
+Bug Fix for GLib version 2.32 or greater
+
+Added statistics timeout option for logging super_mediator stats
+
+Bug Fixes
+
+Version 0.2.1 (2013-02-08)
+==========================
+
+Added Custom DPI Field List for Text Exporters
+
+Added --fields switch to command line arguments
+
+Bug Fix for Time output on some platforms
+
+Bug Fix for SSL/TLS Text Export
+
+Version 0.2.0 (2013-01-16)
+==========================
+
+Retry exporter connections when lost
+
+Keep export statistics per exporter
+
+Bug Fix for polling directory for IPFIX files
+
+Bug Fix for moving collector files
+
+Version 0.1.9 (2012-12-06)
+==========================
+
+Added Custom Field Lists for Text Exporters
+
+Bug Fix for reading from stdin
+
+Other Bug Fixes
+
+Version 0.1.8 (2012-10-26)
+==========================
+	
+Bug Fixes.
+
+Version 0.1.7 (2012-10-09)
+==========================
+
+Added ability to filter by IP in IPset (requires SiLK IPset library)
+
+DNS IPFIX export bug fix.
+
+Add Max TTL Field to DNS Deduplicated IPFIX output
+
+Version 0.1.6 (2012-09-10)
+==========================
+
+Added Automatic import into MySQL database
+
+Bug Fixes
+
+Version 0.1.5 (2012-07-31)
+==========================
+
+Added DNSSEC awareness.
+
+Added New SSL Information Elements.
+
+Added flow stats elements from YAF 2.3.0.
+
+Added DHCP Fingerprinting Elements.
+
+Enhancements for uploading CSV files to a database.
+
+Bug Fixes.
+
+Version 0.1.4 (2012-06-12)
+==========================
+
+Added option to timestamp rolling DPI CSV files.
+
+Added option to print flow "index" with DPI data.
+
+Bug Fixes.
+
+Version 0.1.3 (2012-05-07)
+==========================
+
+Enhanced DPI to CSV export.
+
+Bug Fixes.
+
+Version 0.1.2 (2012-04-03)
+==========================
+
+Bug Fix for multiple exporters. 
+
+Bug Fix for 64 bit OS for text exporters.
+
+Version 0.1.1 (2012-03-28)
+==========================
+
+Option to remove empty output files
+
+Improved Logging
+
+Bug Fix for de-duplication of DNS NXDomain Records
+
+Other Bug Fixes.
+
+Version 0.1.0 (2012-03-01)
+===========================
+
+Initial Release

@@ -1,0 +1,30 @@
+_id: 81e2ec4cca14b094b8e66e211787fa0e
+name: '10012: High data transfer by IP address located in country (v1)'
+index: 'logvehere-probe-*'
+type: metric_aggregation
+filter: []
+alert_transport: []
+import: /usr/local/etc/rulealerts.cfg
+is_enabled: true
+shared: false
+owner: vnfsadmin
+priority: 2
+timestamp_field: '@timestamp'
+sync_bucket_interval: false
+allow_buffer_time_overlap: false
+use_run_every_query_size: false
+query_key: network.dst_geo_ip.country_name.keyword
+doc_type: VPROBE
+max_threshold: 33806
+metric_agg_key: session.received_bytes
+metric_agg_type: sum
+buffer_time:
+  minutes: 1
+description: High data transfer by IP address (server) located in any country
+ls_output_file_path: /var/log/ruleengine/vnfsalert.json
+
+alert:
+  - lsalert
+# Uncomment below lines and Put the command and the arguments as each array elements. 'command: ["/bin/send_alert", "--option", "%(filed.subfield)"]'
+#  - command
+#command: ["/bin/send_alert", "--username", "%(username)"]

@@ -1,0 +1,17 @@
+/var/lib/meta/* {
+        daily
+#        minage 7
+#        maxsize 60G
+#        size 30G
+        rotate 0
+        missingok
+        postrotate
+          /usr/bin/find /var/lib/meta/ -name "*.json" -mtime +14 -exec rm {} \;
+        endscript
+        nocreate
+        notifempty
+}
+# to see status
+# cat /var/lib/logrotate/status
+# to manually test -
+# logrotate --force /etc/logrotate.d/vehere-dpi

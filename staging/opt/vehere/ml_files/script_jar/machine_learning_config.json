@@ -1,0 +1,10 @@
+{
+  "dns_threshold": "0.00012",
+  "netflow_threshold": "0.0016",
+  "dns_out_path": "/var/log/vehere/ml-dnsalert",
+  "netflow_out_path": "/var/log/vehere/ml-alert",
+  "netflow_alert_notification_limit":10,
+  "dns_alert_notification_limit":10,
+  "mlnetflow_service_enable":1,
+  "mldns_service_enable":1
+}

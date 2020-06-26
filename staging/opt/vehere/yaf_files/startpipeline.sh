@@ -1,0 +1,2 @@
+#!/bin/bash
+/usr/local/sbin/pipeline --configuration-file /usr/local/etc/pipeline.conf --alert-log-file /var/log/vehere/ruleengine/alert.log --aux-alert-file /var/log/vehere/ruleengine/aux-alert.log --data-source-configuration-file /usr/local/etc/pipeline-datasources.conf --country-code-file /usr/local/etc/country_codes.pmap --log-pathname /var/log/ruleengine.log --site-config-file /usr/local/etc/silk.conf --time-field-name flowEndMilliseconds

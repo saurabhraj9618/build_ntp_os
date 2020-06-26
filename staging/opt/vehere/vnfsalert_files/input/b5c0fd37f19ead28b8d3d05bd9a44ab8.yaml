@@ -1,0 +1,26 @@
+_id: b5c0fd37f19ead28b8d3d05bd9a44ab8
+name: '10009: Blacklist-known malware and botnet c&c domains'
+index: 'logvehere-probe-*'
+type: blacklist
+filter: []
+alert_transport: []
+import: /usr/local/etc/rulealerts.cfg
+is_enabled: true
+shared: false
+owner: vnfsadmin
+priority: 2
+enabled: true
+timestamp_field: '@timestamp'
+compare_key: payload.dns_domain_names
+blacklist:
+  - '!file /usr/local/etc/ruleengine/domain.txt'
+ls_output_file_path: /var/log/ruleengine/vnfsalert.json
+description: 'MD5,RAT,Trojan,Dyre,ZeuS Gameover,chinad,bamital,Post Tovar GOZ,corebot'
+owned: true
+email: ''
+
+alert:
+  - lsalert
+# Uncomment below lines and Put the command and the arguments as each array elements. 'command: ["/bin/send_alert", "--option", "%(filed.subfield)"]'
+#  - command
+#command: ["/bin/send_alert", "--username", "%(username)"]

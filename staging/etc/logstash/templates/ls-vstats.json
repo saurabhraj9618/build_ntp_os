@@ -1,0 +1,10 @@
+{
+   "template": "logvehere-stats-*",
+      "settings": {
+         "index": {
+            "number_of_shards": 4,
+            "number_of_replicas": 0
+         }
+      },
+   "version": 15021803
+}

@@ -1,0 +1,17 @@
+[Unit]
+Description=ML Data Merge Service
+
+[Service]
+Restart=always
+RestartSec=30
+Type=simple
+User=logstash
+Group=logstash
+#ExecStart=/usr/local/bin/ml-analyzer/dns.sh
+ExecStart=/usr/local/bin/ml-analyzer/dataMerge.sh
+
+SyslogIdentifier=mldatamerge
+[Install]
+WantedBy=multi-user.target
+#Alias=mldns.service
+

@@ -1,0 +1,10 @@
+{
+  "visState": "{\"title\":\"System Navigation\",\"type\":\"markdown\",\"params\":{\"markdown\":\"- [Overview](#/dashboard/System-overview)\\n\\n- [Load/CPU](#/dashboard/CPU)\\n\\n- [Memory](#/dashboard/Memory)\\n\\n- [Processes](#/dashboard/Processes)\\n\\n- [Network](#/dashboard/Network)\\n\\n- [Filesystem](#/dashboard/Filesystem)\\n\\n- [Filesystem per Host](#/dashboard/Filesystem-per-Host)\\n\\n- [CPU/Memory per container](#/dashboard/CPU-slash-Memory-per-container)\"},\"aggs\":[],\"listeners\":{}}",
+  "description": "", 
+  "title": "System Navigation", 
+  "uiStateJSON": "{}", 
+  "version": 1, 
+  "kibanaSavedObjectMeta": {
+    "searchSourceJSON": "{\"query\":{\"query_string\":{\"analyze_wildcard\":true,\"query\":\"*\"}},\"filter\":[]}"
+  }
+}

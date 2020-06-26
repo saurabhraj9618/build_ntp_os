@@ -1,0 +1,20 @@
+deb http://debianmirror.nkn.in/debian/ stretch main
+deb-src http://debianmirror.nkn.in/debian/ stretch main
+
+deb http://security.debian.org/debian-security stretch/updates main contrib
+deb-src http://security.debian.org/debian-security stretch/updates main contrib
+
+deb http://debianmirror.nkn.in/debian/ stretch-updates main contrib
+deb-src http://debianmirror.nkn.in/debian/ stretch-updates main contrib
+
+#deb http://deb.debian.org/debian stretch main
+#deb-src http://deb.debian.org/debian stretch main
+
+#deb http://security.debian.org/debian-security/ stretch/updates main
+#deb-src http://security.debian.org/debian-security/ stretch/updates main
+
+#deb http://deb.debian.org/debian stretch-updates main
+#deb-src http://deb.debian.org/debian stretch-updates main
+
+deb http://httpredir.debian.org/debian/ stretch main contrib non-free
+#deb http://live-systems.org/ sid-snapshots main contrib non-free

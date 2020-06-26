@@ -1,0 +1,30 @@
+_id: 8167f5e1baca4130eb681e0b68fd131f
+name: '10015: IP address using numerous applications (v2)'
+index: 'logvehere-probe-*'
+type: metric_aggregation
+filter: []
+alert_transport: []
+import: /usr/local/etc/rulealerts.cfg
+is_enabled: true
+shared: false
+owner: vnfsadmin
+priority: 2
+timestamp_field: '@timestamp'
+description: IP address (Client) using numerous applications
+sync_bucket_interval: false
+allow_buffer_time_overlap: false
+use_run_every_query_size: false
+query_key: network.src_ip
+doc_type: 'VPROBE'
+max_threshold: 5
+metric_agg_key: session.protocol.keyword
+metric_agg_type: cardinality
+buffer_time:
+  minutes: 1
+ls_output_file_path: /var/log/ruleengine/vnfsalert.json
+
+alert:
+  - lsalert
+# Uncomment below lines and Put the command and the arguments as each array elements. 'command: ["/bin/send_alert", "--option", "%(filed.subfield)"]'
+#  - command
+#command: ["/bin/send_alert", "--username", "%(username)"]
